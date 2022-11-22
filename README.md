@@ -5,7 +5,7 @@
 [![Tests](https://github.com/simonw/dclient/workflows/Test/badge.svg)](https://github.com/simonw/dclient/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/dclient/blob/master/LICENSE)
 
-A client CLI utility for Datasette instances
+A client CLI utility for [Datasette](https://datasette.io/) instances
 
 ## Installation
 
@@ -13,9 +13,26 @@ Install this tool using `pip`:
 
     pip install dclient
 
+If you want to install it in the same virtual environment as Datasette (to use it as a plugin) you can instead run:
+
+    datasette install dclient
+
+## Standalone v.s. plugin
+
+Once installed you can use this tool like so:
+
+    dclient --help
+
+If you also have Datasette installed in the same environment it will register itself as a command plugin.
+
+This means you can run any of these commands using `datasette client` instead, like this:
+
+    datasette client --help
+    datasette client query https://latest.datasette.io/fixtures "select * from facetable limit 1"
+
 ## Running queries
 
-You can run SQL queries against a Datasette instance like so:
+You can run SQL queries against a Datasette instance like this:
 
 ```
 $ dclient query https://latest.datasette.io/fixtures "select * from facetable limit 1"
