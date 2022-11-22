@@ -57,6 +57,11 @@ def test_aliases(mocker, tmpdir, httpx_mock):
     assert result.exit_code == 0
     assert result.output == "foo = https://example.com/foo\n"
 
+    # --json mode:
+    result = runner.invoke(cli, ["alias", "list", "--json"])
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {"foo": "https://example.com/foo"}
+
     # Check the aliases file
     aliases_file = pathlib.Path(tmpdir) / "aliases.json"
     assert json.loads(aliases_file.read_text()) == {"foo": "https://example.com/foo"}
@@ -84,3 +89,13 @@ def test_aliases(mocker, tmpdir, httpx_mock):
     # Should have hit https://example.com/foo.json
     url = httpx_mock.get_request().url
     assert url == "https://example.com/foo.json?sql=select+11+%2A+3&_shape=objects"
+
+    # Remove alias
+    result = runner.invoke(cli, ["alias", "remove", "invalid"])
+    assert result.exit_code == 1
+    assert result.output == "Error: No such alias\n"
+
+    result = runner.invoke(cli, ["alias", "remove", "foo"])
+    assert result.exit_code == 0
+    assert result.output == ""
+    assert json.loads(aliases_file.read_text()) == {}

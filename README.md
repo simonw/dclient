@@ -98,8 +98,73 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  add   Add an alias
-  list  List aliases
+  add     Add an alias
+  list    List aliases
+  remove  Remove an alias
+
+```
+<!-- [[[end]]] -->
+
+### dclient alias list --help
+
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["alias", "list", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient alias list [OPTIONS]
+
+  List aliases
+
+Options:
+  --json  Output raw JSON
+  --help  Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+### dclient alias add --help
+
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["alias", "add", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient alias add [OPTIONS] NAME URL
+
+  Add an alias
+
+Options:
+  --help  Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+### dclient alias remove --help
+
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["alias", "remove", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient alias remove [OPTIONS] NAME
+
+  Remove an alias
+
+Options:
+  --help  Show this message and exit.
 
 ```
 <!-- [[[end]]] -->
