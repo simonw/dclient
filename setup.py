@@ -32,6 +32,15 @@ setup(
         "console_scripts": ["dclient = dclient.cli:cli"],
     },
     install_requires=["click", "httpx", "appdirs"],
-    extras_require={"test": ["pytest", "pytest-httpx", "cogapp", "pytest-mock"]},
+    extras_require={
+        "test": [
+            "pytest",
+            "pytest-asyncio",
+            "pytest-httpx",
+            "cogapp",
+            "pytest-mock",
+            "datasette",
+        ]
+    },
     python_requires=">=3.7",
 )
