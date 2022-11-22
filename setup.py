@@ -1,7 +1,7 @@
 from setuptools import setup
 import os
 
-VERSION = "0.1"
+VERSION = "0.1a0"
 
 
 def get_long_description():
@@ -31,9 +31,7 @@ setup(
         [console_scripts]
         dclient=dclient.cli:cli
     """,
-    install_requires=["click"],
-    extras_require={
-        "test": ["pytest"]
-    },
+    install_requires=["click", "httpx"],
+    extras_require={"test": ["pytest", "pytest-httpx", "cogapp"]},
     python_requires=">=3.7",
 )

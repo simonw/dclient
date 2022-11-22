@@ -23,6 +23,32 @@ You can also use:
 
     python -m dclient --help
 
+### dclient query
+
+<!-- [[[cog
+import cog
+from dclient import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["query", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient query [OPTIONS] URL SQL
+
+  Run a SQL query against a Datasette database URL
+
+  Returns a JSON array of objects
+
+Options:
+  --help  Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
 ## Development
 
 To contribute to this tool, first checkout the code. Then create a new virtual environment:
