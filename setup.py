@@ -27,10 +27,10 @@ setup(
     license="Apache License, Version 2.0",
     version=VERSION,
     packages=["dclient"],
-    entry_points="""
-        [console_scripts]
-        dclient=dclient.cli:cli
-    """,
+    entry_points={
+        "datasette": ["client = dclient.plugin"],
+        "console_scripts": ["dclient = dclient.cli:cli"],
+    },
     install_requires=["click", "httpx", "appdirs"],
     extras_require={"test": ["pytest", "pytest-httpx", "cogapp", "pytest-mock"]},
     python_requires=">=3.7",
