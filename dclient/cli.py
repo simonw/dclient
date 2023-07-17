@@ -1,12 +1,11 @@
 import click
 import httpx
 import json
-import appdirs
 import pathlib
 
 
 def get_config_dir():
-    return pathlib.Path(appdirs.user_config_dir("dclient"))
+    return pathlib.Path(click.get_app_dir("io.datasette.dclient"))
 
 
 @click.group()
