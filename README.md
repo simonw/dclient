@@ -81,6 +81,30 @@ Options:
 ```
 <!-- [[[end]]] -->
 
+## Authentication
+
+`dclient` can handle API tokens for Datasette instances that require authentication.
+
+You can pass an API token to `query` using `-t/--token` like this:
+
+```bash
+dclient query https://latest.datasette.io/fixtures "select * from facetable" -t dstok_mytoken
+```
+You can also store tokens for a specific URL prefix. To always use `dstok_mytoken` for any URL on the `https://latest.datasette.io/` instance you can run this:
+```bash
+dclient auth add https://latest.datasette.io/
+```
+Then paste in the token and hit enter when prompted to do so.
+
+To list which URLs you have set tokens for, run the `auth list` command:
+```bash
+dclient auth list
+```
+To delete the token for a specific URL, run `auth remove`:
+```bash
+dclient auth remove https://latest.datasette.io/
+```
+
 ## Aliases
 
 You can assign an alias to a Datasette database using the `dclient alias` command:
