@@ -137,7 +137,16 @@ def auth():
 @click.argument("alias_or_url")
 @click.option("--token", prompt=True, hide_input=True)
 def add(alias_or_url, token):
-    "Add an authentication token"
+    """
+    Add an authentication token for an alias or URL
+
+    Example usage:
+
+    \b
+        dclient auth add https://datasette.io/content
+
+    Paste in the token when prompted.
+    """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
     url = alias_or_url
