@@ -28,3 +28,15 @@ def url_matches_prefix(url: str, prefix: str) -> bool:
         prefix_path += "/"
 
     return url_path.startswith(prefix_path)
+
+
+def token_for_url(url: str, tokens: dict) -> str:
+    matches = []
+    for prefix_url, token in tokens.items():
+        if url_matches_prefix(url, prefix_url):
+            matches.append((prefix_url, token))
+    # Sort by length of prefix_url, so that the longest match is first
+    matches.sort(key=lambda x: len(x[0]), reverse=True)
+    if matches:
+        return matches[0][1]
+    return None

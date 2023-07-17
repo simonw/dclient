@@ -2,7 +2,7 @@ import click
 import httpx
 import json
 import pathlib
-from .utils import url_matches_prefix
+from .utils import token_for_url
 
 
 def get_config_dir():
@@ -33,7 +33,7 @@ def query(url, sql, token):
         url += ".json"
     if token is None:
         # Maybe there's a token in auth.json?
-        token = _token_for_url_from_auth(url, get_config_dir() / "auth.json")
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
     headers = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -75,13 +75,6 @@ def query(url, sql, token):
 
     # Output results
     click.echo(json.dumps(response.json()["rows"], indent=2))
-
-
-def _token_for_url_from_auth(url, auth_file):
-    auths = _load_auths(auth_file)
-    for auth_url, token in auths.items():
-        if url_matches_prefix(url, auth_url):
-            return token
 
 
 @cli.group()
