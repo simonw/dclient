@@ -95,10 +95,10 @@ def list_(_json):
             click.echo(f"{alias} = {url}")
 
 
-@alias.command()
+@alias.command(name="add")
 @click.argument("name")
 @click.argument("url")
-def add(name, url):
+def alias_add(name, url):
     "Add an alias"
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -108,9 +108,9 @@ def add(name, url):
     aliases_file.write_text(json.dumps(aliases, indent=4))
 
 
-@alias.command()
+@alias.command(name="remove")
 @click.argument("name")
-def remove(name):
+def alias_remove(name):
     "Remove an alias"
     config_dir = get_config_dir()
     aliases_file = config_dir / "aliases.json"
@@ -127,10 +127,10 @@ def auth():
     "Manage authentication for different instances"
 
 
-@auth.command()
+@auth.command(name="add")
 @click.argument("alias_or_url")
 @click.option("--token", prompt=True, hide_input=True)
-def add(alias_or_url, token):
+def auth_add(alias_or_url, token):
     """
     Add an authentication token for an alias or URL
 
@@ -155,7 +155,7 @@ def add(alias_or_url, token):
 
 
 @auth.command(name="list")
-def list_():
+def auth_list():
     "List stored API tokens"
     auths_file = get_config_dir() / "auth.json"
     click.echo("Tokens file: {}".format(auths_file))
@@ -164,6 +164,20 @@ def list_():
         click.echo()
     for url, token in auths.items():
         click.echo("{}:\t{}..".format(url, token[:1]))
+
+
+@auth.command(name="remove")
+@click.argument("alias_or_url")
+def auth_remove(alias_or_url):
+    "Remove the API token for an alias or URL"
+    config_dir = get_config_dir()
+    auth_file = config_dir / "auth.json"
+    auths = _load_auths(auth_file)
+    try:
+        del auths[alias_or_url]
+        auth_file.write_text(json.dumps(auths, indent=4))
+    except KeyError:
+        raise click.ClickException("No such URL or alias")
 
 
 def _load_aliases(aliases_file):
