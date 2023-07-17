@@ -156,11 +156,14 @@ def add(alias_or_url, token):
 
 @auth.command(name="list")
 def list_():
-    "List auths"
+    "List stored API tokens"
     auths_file = get_config_dir() / "auth.json"
-    print(auths_file)
+    click.echo("Tokens file: {}".format(auths_file))
     auths = _load_auths(auths_file)
-    click.echo(json.dumps(auths, indent=2))
+    if auths:
+        click.echo()
+    for url, token in auths.items():
+        click.echo("{}:\t{}..".format(url, token[:1]))
 
 
 def _load_aliases(aliases_file):
