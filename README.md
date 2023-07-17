@@ -10,13 +10,13 @@ A client CLI utility for [Datasette](https://datasette.io/) instances
 ## Installation
 
 Install this tool using `pip`:
-
-    pip install dclient
-
+```bash
+pip install dclient
+```
 If you want to install it in the same virtual environment as Datasette (to use it as a plugin) you can instead run:
-
-    datasette install dclient
-
+```bash
+datasette install dclient
+```
 ## Running a query
 
 ```bash
@@ -30,15 +30,16 @@ Visit **[dclient.datasette.io](https://dclient.datasette.io)** for full document
 ## Development
 
 To contribute to this tool, first checkout the code. Then create a new virtual environment:
-
-    cd dclient
-    python -m venv venv
-    source venv/bin/activate
-
+```bash
+cd dclient
+python -m venv venv
+source venv/bin/activate
+```
 Now install the dependencies and test dependencies:
-
-    pip install -e '.[test]'
-
+```bash
+pip install -e '.[test]'
+```
 To run the tests:
-
-    pytest
+```bash
+pytest
+```
