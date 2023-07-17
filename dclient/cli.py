@@ -37,16 +37,43 @@ def query(url, sql, token):
     if token:
         headers["Authorization"] = f"Bearer {token}"
     response = httpx.get(url, params={"sql": sql, "_shape": "objects"}, headers=headers)
-    if response.status_code != 200 or not response.json()["ok"]:
-        data = response.json()
+    if response.status_code != 200:
+        # Is it valid JSON?
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            raise click.ClickException(
+                "{} status code. Response was not valid JSON".format(
+                    response.status_code
+                )
+            )
         bits = []
         if data.get("title"):
             bits.append(data["title"])
         if data.get("error"):
             bits.append(data["error"])
+        raise click.ClickException(
+            "{} status code. {}".format(response.status_code, ": ".join(bits))
+        )
+
+    # We should have JSON now
+    try:
+        data = response.json()
+    except json.JSONDecodeError:
+        raise click.ClickException("Response was not valid JSON")
+    # ... but it may have a {"ok": false} error
+    if not data.get("ok"):
+        bits = []
+        if data.get("title"):
+            bits.append(data["title"])
+        if data.get("error"):
+            bits.append(data["error"])
+        if not bits:
+            bits = [json.dumps(data)]
         raise click.ClickException(": ".join(bits))
-    else:
-        click.echo(json.dumps(response.json()["rows"], indent=2))
+
+    # Output results
+    click.echo(json.dumps(response.json()["rows"], indent=2))
 
 
 def _token_for_url_from_auth(url, auth_file):

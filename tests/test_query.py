@@ -17,7 +17,10 @@ def test_query_error(httpx_mock):
     runner = CliRunner()
     result = runner.invoke(cli, ["query", "https://example.com", "hello"])
     assert result.exit_code == 1
-    assert result.output == "Error: Invalid SQL: Statement must be a SELECT\n"
+    assert (
+        result.output
+        == "Error: 400 status code. Invalid SQL: Statement must be a SELECT\n"
+    )
 
 
 def test_query(httpx_mock):
