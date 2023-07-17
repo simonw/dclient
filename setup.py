@@ -31,7 +31,7 @@ setup(
         "datasette": ["client = dclient.plugin"],
         "console_scripts": ["dclient = dclient.cli:cli"],
     },
-    install_requires=["click", "httpx", "appdirs"],
+    install_requires=["click", "httpx"],
     extras_require={
         "test": [
             "pytest",
