@@ -88,7 +88,9 @@ def test_aliases(mocker, tmpdir, httpx_mock):
 
     # Should have hit https://example.com/foo.json
     url = httpx_mock.get_request().url
-    assert url == "https://example.com/foo.json?sql=select+11+%2A+3&_shape=objects"
+    assert url.host == "example.com"
+    assert url.path == "/foo.json"
+    assert dict(url.params) == {"sql": "select 11 * 3", "_shape": "objects"}
 
     # Remove alias
     result = runner.invoke(cli, ["alias", "remove", "invalid"])
