@@ -2,6 +2,7 @@ from click.testing import CliRunner
 from dclient.cli import cli
 import json
 import pathlib
+import pytest
 
 
 def test_query_error(httpx_mock):
@@ -17,10 +18,14 @@ def test_query_error(httpx_mock):
     runner = CliRunner()
     result = runner.invoke(cli, ["query", "https://example.com", "hello"])
     assert result.exit_code == 1
-    assert result.output == "Error: Invalid SQL: Statement must be a SELECT\n"
+    assert (
+        result.output
+        == "Error: 400 status code. Invalid SQL: Statement must be a SELECT\n"
+    )
 
 
-def test_query(httpx_mock):
+@pytest.mark.parametrize("with_token", (False, True))
+def test_query(httpx_mock, with_token):
     httpx_mock.add_response(
         json={
             "ok": True,
@@ -37,9 +42,21 @@ def test_query(httpx_mock):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(cli, ["query", "https://example.com", "hello"])
+    args = ["query", "https://example.com", "hello"]
+    if with_token:
+        args.append("--token")
+        args.append("xyz")
+    result = runner.invoke(cli, args)
     assert result.exit_code == 0
     assert json.loads(result.output) == [{"5 * 2": 10}]
+
+    # Check the request
+    request = httpx_mock.get_request()
+    assert str(request.url) == "https://example.com.json?sql=hello&_shape=objects"
+    if with_token:
+        assert request.headers["authorization"] == "Bearer xyz"
+    else:
+        assert "authorization" not in request.headers
 
 
 def test_aliases(mocker, tmpdir, httpx_mock):

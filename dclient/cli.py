@@ -2,6 +2,7 @@ import click
 import httpx
 import json
 import pathlib
+from .utils import token_for_url
 
 
 def get_config_dir():
@@ -17,7 +18,8 @@ def cli():
 @cli.command()
 @click.argument("url")
 @click.argument("sql")
-def query(url, sql):
+@click.option("--token", "-t", help="API token")
+def query(url, sql, token):
     """
     Run a SQL query against a Datasette database URL
 
@@ -29,17 +31,50 @@ def query(url, sql):
         url = aliases[url]
     if not url.endswith(".json"):
         url += ".json"
-    response = httpx.get(url, params={"sql": sql, "_shape": "objects"})
-    if response.status_code != 200 or not response.json()["ok"]:
-        data = response.json()
+    if token is None:
+        # Maybe there's a token in auth.json?
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    response = httpx.get(url, params={"sql": sql, "_shape": "objects"}, headers=headers)
+    if response.status_code != 200:
+        # Is it valid JSON?
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            raise click.ClickException(
+                "{} status code. Response was not valid JSON".format(
+                    response.status_code
+                )
+            )
         bits = []
         if data.get("title"):
             bits.append(data["title"])
         if data.get("error"):
             bits.append(data["error"])
+        raise click.ClickException(
+            "{} status code. {}".format(response.status_code, ": ".join(bits))
+        )
+
+    # We should have JSON now
+    try:
+        data = response.json()
+    except json.JSONDecodeError:
+        raise click.ClickException("Response was not valid JSON")
+    # ... but it may have a {"ok": false} error
+    if not data.get("ok"):
+        bits = []
+        if data.get("title"):
+            bits.append(data["title"])
+        if data.get("error"):
+            bits.append(data["error"])
+        if not bits:
+            bits = [json.dumps(data)]
         raise click.ClickException(": ".join(bits))
-    else:
-        click.echo(json.dumps(response.json()["rows"], indent=2))
+
+    # Output results
+    click.echo(json.dumps(response.json()["rows"], indent=2))
 
 
 @cli.group()
@@ -60,10 +95,10 @@ def list_(_json):
             click.echo(f"{alias} = {url}")
 
 
-@alias.command()
+@alias.command(name="add")
 @click.argument("name")
 @click.argument("url")
-def add(name, url):
+def alias_add(name, url):
     "Add an alias"
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -73,9 +108,9 @@ def add(name, url):
     aliases_file.write_text(json.dumps(aliases, indent=4))
 
 
-@alias.command()
+@alias.command(name="remove")
 @click.argument("name")
-def remove(name):
+def alias_remove(name):
     "Remove an alias"
     config_dir = get_config_dir()
     aliases_file = config_dir / "aliases.json"
@@ -87,9 +122,75 @@ def remove(name):
         raise click.ClickException("No such alias")
 
 
+@cli.group()
+def auth():
+    "Manage authentication for different instances"
+
+
+@auth.command(name="add")
+@click.argument("alias_or_url")
+@click.option("--token", prompt=True, hide_input=True)
+def auth_add(alias_or_url, token):
+    """
+    Add an authentication token for an alias or URL
+
+    Example usage:
+
+    \b
+        dclient auth add https://datasette.io/content
+
+    Paste in the token when prompted.
+    """
+    aliases_file = get_config_dir() / "aliases.json"
+    aliases = _load_aliases(aliases_file)
+    url = alias_or_url
+    if alias_or_url in aliases:
+        url = aliases[alias_or_url]
+    config_dir = get_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    auth_file = config_dir / "auth.json"
+    auths = _load_auths(auth_file)
+    auths[url] = token
+    auth_file.write_text(json.dumps(auths, indent=4))
+
+
+@auth.command(name="list")
+def auth_list():
+    "List stored API tokens"
+    auths_file = get_config_dir() / "auth.json"
+    click.echo("Tokens file: {}".format(auths_file))
+    auths = _load_auths(auths_file)
+    if auths:
+        click.echo()
+    for url, token in auths.items():
+        click.echo("{}:\t{}..".format(url, token[:1]))
+
+
+@auth.command(name="remove")
+@click.argument("alias_or_url")
+def auth_remove(alias_or_url):
+    "Remove the API token for an alias or URL"
+    config_dir = get_config_dir()
+    auth_file = config_dir / "auth.json"
+    auths = _load_auths(auth_file)
+    try:
+        del auths[alias_or_url]
+        auth_file.write_text(json.dumps(auths, indent=4))
+    except KeyError:
+        raise click.ClickException("No such URL or alias")
+
+
 def _load_aliases(aliases_file):
     if aliases_file.exists():
         aliases = json.loads(aliases_file.read_text())
     else:
         aliases = {}
     return aliases
+
+
+def _load_auths(auth_file):
+    if auth_file.exists():
+        auths = json.loads(auth_file.read_text())
+    else:
+        auths = {}
+    return auths
