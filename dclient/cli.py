@@ -2,6 +2,7 @@ import click
 import httpx
 import json
 import pathlib
+from .utils import url_matches_prefix
 
 
 def get_config_dir():
@@ -79,7 +80,7 @@ def query(url, sql, token):
 def _token_for_url_from_auth(url, auth_file):
     auths = _load_auths(auth_file)
     for auth_url, token in auths.items():
-        if url.startswith(auth_url):
+        if url_matches_prefix(url, auth_url):
             return token
 
 
