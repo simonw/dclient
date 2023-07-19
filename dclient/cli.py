@@ -1,8 +1,12 @@
 import click
 import httpx
+import itertools
 import json
 import pathlib
+from sqlite_utils.utils import rows_from_file, Format, TypeTracker
 from .utils import token_for_url
+
+INSERT_BATCH_SIZE = 50
 
 
 def get_config_dir():
@@ -16,10 +20,10 @@ def cli():
 
 
 @cli.command()
-@click.argument("url")
+@click.argument("url_or_alias")
 @click.argument("sql")
 @click.option("--token", "-t", help="API token")
-def query(url, sql, token):
+def query(url_or_alias, sql, token):
     """
     Run a SQL query against a Datasette database URL
 
@@ -27,9 +31,11 @@ def query(url, sql, token):
     """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
-    if url in aliases:
-        url = aliases[url]
-    if not url.endswith(".json"):
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+    if not url_or_alias.endswith(".json"):
         url += ".json"
     if token is None:
         # Maybe there's a token in auth.json?
@@ -75,6 +81,97 @@ def query(url, sql, token):
 
     # Output results
     click.echo(json.dumps(response.json()["rows"], indent=2))
+
+
+@cli.command()
+@click.argument("url_or_alias")
+@click.argument("table")
+@click.argument("file", type=click.File("rb"))
+@click.option("format_csv", "--csv", is_flag=True, help="Input is CSV")
+@click.option("format_tsv", "--tsv", is_flag=True, help="Input is TSV")
+@click.option("format_json", "--json", is_flag=True, help="Input is JSON")
+@click.option("format_nl", "--nl", is_flag=True, help="Input is newline-delimited JSON")
+@click.option(
+    "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
+)
+@click.option("--create", is_flag=True, help="Create table if it does not exist")
+@click.option("--token", "-t", help="API token")
+def insert(
+    url_or_alias,
+    table,
+    file,
+    format_csv,
+    format_tsv,
+    format_json,
+    format_nl,
+    no_detect_types,
+    create,
+    token,
+):
+    """
+    Insert data into a remote Datasette instance
+
+    Example usage:
+
+    \b
+        dclient insert \\
+          https://private.datasette.cloud/data \\
+          mytable data.csv
+    """
+    aliases_file = get_config_dir() / "aliases.json"
+    aliases = _load_aliases(aliases_file)
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+
+    if token is None:
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+
+    print(url, table)
+    format = None
+    if format_csv:
+        format = Format.CSV
+    elif format_tsv:
+        format = Format.CSV
+    elif format_json:
+        format = Format.JSON
+    elif format_nl:
+        format = Format.NL
+    if format is None and file.name == "<stdin>":
+        raise click.ClickException(
+            "An explicit format is required  - e.g. --csv "
+            "- when reading from standard input"
+        )
+    rows, format = rows_from_file(file, format=format)
+
+    first = True
+
+    for batch in _batches(rows, INSERT_BATCH_SIZE):
+        types = None
+        if first and not no_detect_types:
+            # Detect types on first batch
+            tracker = TypeTracker()
+            list(tracker.wrap(batch))
+            types = tracker.types
+            # Convert types
+            for row in batch:
+                for key, value in row.items():
+                    if value is None:
+                        continue
+                    if types[key] == "integer":
+                        if not value:
+                            row[key] = None
+                        else:
+                            row[key] = int(value)
+                    elif types[key] == "float":
+                        if not value:
+                            row[key] = None
+                        else:
+                            row[key] = float(value)
+        first = False
+        response = _insert_batch(url, table, batch, token=token, create=create)
+        print(response)
 
 
 @cli.group()
@@ -194,3 +291,36 @@ def _load_auths(auth_file):
     else:
         auths = {}
     return auths
+
+
+def _batches(iterable, size):
+    while True:
+        batch = list(itertools.islice(iterable, size))
+        if not batch:
+            return
+        yield batch
+
+
+def _insert_batch(url, table, batch, token, create):
+    if create:
+        data = {
+            "table": table,
+            "rows": batch,
+        }
+        url = "{}/-/create".format(url)
+    else:
+        data = {
+            "rows": batch,
+        }
+        url = "{}/{}/-/insert".format(url, table)
+    response = httpx.post(
+        url,
+        headers={
+            "Authorization": "Bearer {}".format(token),
+            "Content-Type": "application/json",
+        },
+        json=data,
+        timeout=40.0,
+    )
+    response.raise_for_status()
+    return response.json()
