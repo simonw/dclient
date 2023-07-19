@@ -9,6 +9,13 @@ To insert data from a `data.csv` file into a table called `my_table`, creating t
 ```bash
 dclient insert https://my-private-space.datasette.cloud/data my_table data.csv --create
 ```
+You can also pipe data into standard input:
+```bash
+curl -s 'https://api.github.com/repos/simonw/dclient/issues' | \
+  dclient insert \
+    https://my-private-space.datasette.cloud/data \
+    issues - --create
+```
 
 ## Supported formats
 
