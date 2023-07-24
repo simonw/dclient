@@ -52,12 +52,23 @@ def test_insert_mocked(httpx_mock, tmpdir):
 
 
 SIMPLE_CSV = "a,b,c\n1,2,3\n"
+SIMPLE_TSV = "a\tb\tc\n1\t2\t3\n"
+SIMPLE_JSON = json.dumps(
+    [
+        {
+            "a": 1,
+            "b": 2,
+            "c": 3,
+        }
+    ]
+)
+SIMPLE_JSON_NL = '{"a": 1, "b": 2, "c": 3}\n'
 
 
 InsertTest = namedtuple(
     "InsertTest",
     (
-        "csv_data",
+        "input_data",
         "cmd_args",
         "table_exists",
         "expected_output",
@@ -67,19 +78,35 @@ InsertTest = namedtuple(
 )
 
 
+def make_format_test(content, arg):
+    return InsertTest(
+        input_data=content,
+        # Using --silent to force no display of progress bar, since it won't
+        # be shown for the JSON formats anyway
+        cmd_args=["--silent", "--create"] + ([arg] if arg is not None else []),
+        table_exists=False,
+        expected_output="",
+        should_error=False,
+        expected_table_json=[{"rowid": 1, "a": 1, "b": 2, "c": 3}],
+    )
+
+
 @pytest.mark.parametrize(
-    "csv_data,cmd_args,table_exists,expected_output,should_error,expected_table_json",
+    "input_data,cmd_args,table_exists,expected_output,should_error,expected_table_json",
     (
+        # Auto-detect formats
+        make_format_test(SIMPLE_CSV, None),
+        make_format_test(SIMPLE_TSV, None),
+        make_format_test(SIMPLE_JSON, None),
+        make_format_test(SIMPLE_JSON_NL, None),
+        # Explicit formats
+        make_format_test(SIMPLE_CSV, "--csv"),
+        make_format_test(SIMPLE_TSV, "--tsv"),
+        make_format_test(SIMPLE_JSON, "--json"),
+        make_format_test(SIMPLE_JSON_NL, "--nl"),
+        # No --create option should error:
         InsertTest(
-            csv_data=SIMPLE_CSV,
-            cmd_args=["--create"],
-            table_exists=False,
-            expected_output="Inserting rows\n",
-            should_error=False,
-            expected_table_json=[{"rowid": 1, "a": 1, "b": 2, "c": 3}],
-        ),
-        InsertTest(
-            csv_data=SIMPLE_CSV,
+            input_data=SIMPLE_CSV,
             cmd_args=[],
             table_exists=False,
             expected_output="Inserting rows\nError: Table not found: table1\n",
@@ -88,7 +115,7 @@ InsertTest = namedtuple(
         ),
         # Existing table, conflicting pk
         InsertTest(
-            csv_data=SIMPLE_CSV,
+            input_data=SIMPLE_CSV,
             cmd_args=[],
             table_exists=True,
             expected_output="Inserting rows\nUNIQUE constraint failed: table1.a\nError: UNIQUE constraint failed: table1.a\n",
@@ -97,7 +124,7 @@ InsertTest = namedtuple(
         ),
         # Existing table, --replace
         InsertTest(
-            csv_data="a,b,c\n1,2,4\n",
+            input_data="a,b,c\n1,2,4\n",
             cmd_args=["--replace"],
             table_exists=True,
             expected_output="Inserting rows\n",
@@ -106,7 +133,7 @@ InsertTest = namedtuple(
         ),
         # Existing table, --ignore
         InsertTest(
-            csv_data="a,b,c\n1,2,4\n",
+            input_data="a,b,c\n1,2,4\n",
             cmd_args=["--ignore"],
             table_exists=True,
             expected_output="Inserting rows\n",
@@ -118,7 +145,7 @@ InsertTest = namedtuple(
 def test_insert_against_datasette(
     httpx_mock,
     tmpdir,
-    csv_data,
+    input_data,
     cmd_args,
     table_exists,
     expected_output,
@@ -183,8 +210,9 @@ def test_insert_against_datasette(
 
     httpx_mock.add_callback(custom_response)
 
-    path = pathlib.Path(tmpdir) / "data.csv"
-    path.write_text(csv_data)
+    path = pathlib.Path(tmpdir) / "data.txt"
+    print("\nhere goes with", path, "\n", input_data)
+    path.write_text(input_data)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -193,7 +221,6 @@ def test_insert_against_datasette(
             "http://datasette.example.com/data",
             "table1",
             str(path),
-            "--csv",
             "--token",
             token,
         ]

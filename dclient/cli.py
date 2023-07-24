@@ -152,7 +152,7 @@ def insert(
     if format_csv:
         format = Format.CSV
     elif format_tsv:
-        format = Format.CSV
+        format = Format.TSV
     elif format_json:
         format = Format.JSON
     elif format_nl:
@@ -171,6 +171,11 @@ def insert(
         file_size = None
 
     rows, format = rows_from_file(fp, format=format)
+
+    if format in (Format.JSON, Format.NL):
+        # Disable progress bar - it can't handle these formats
+        file_size = None
+        no_detect_types = True
 
     first = True
 
@@ -345,6 +350,7 @@ def _load_auths(auth_file):
 
 
 def _batches(iterable, size):
+    iterable = iter(iterable)
     while True:
         batch = list(itertools.islice(iterable, size))
         if not batch:
