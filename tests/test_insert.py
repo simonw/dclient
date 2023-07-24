@@ -211,7 +211,6 @@ def test_insert_against_datasette(
     httpx_mock.add_callback(custom_response)
 
     path = pathlib.Path(tmpdir) / "data.txt"
-    print("\nhere goes with", path, "\n", input_data)
     path.write_text(input_data)
     runner = CliRunner()
     result = runner.invoke(
