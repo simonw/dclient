@@ -1,5 +1,6 @@
 import click
 import httpx
+import io
 import itertools
 import json
 import pathlib
@@ -92,6 +93,7 @@ def query(url_or_alias, sql, token):
 @click.option("format_tsv", "--tsv", is_flag=True, help="Input is TSV")
 @click.option("format_json", "--json", is_flag=True, help="Input is JSON")
 @click.option("format_nl", "--nl", is_flag=True, help="Input is newline-delimited JSON")
+@click.option("--encoding", help="Character encoding for CSV/TSV")
 @click.option(
     "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
 )
@@ -119,6 +121,7 @@ def insert(
     format_tsv,
     format_json,
     format_nl,
+    encoding,
     no_detect_types,
     replace,
     ignore,
@@ -170,7 +173,10 @@ def insert(
         fp = sys.stdin.buffer
         file_size = None
 
-    rows, format = rows_from_file(fp, format=format)
+    try:
+        rows, format = rows_from_file(fp, format=format, encoding=encoding)
+    except Exception as ex:
+        raise click.ClickException(str(ex))
 
     if format in (Format.JSON, Format.NL):
         # Disable progress bar - it can't handle these formats

@@ -10,6 +10,11 @@ import pytest
 
 
 @pytest.fixture
+def assert_all_responses_were_requested() -> bool:
+    return False
+
+
+@pytest.fixture
 def non_mocked_hosts():
     # This ensures httpx-mock will not affect Datasette's own
     # httpx calls made in the tests by datasette.client:
@@ -63,6 +68,12 @@ SIMPLE_JSON = json.dumps(
     ]
 )
 SIMPLE_JSON_NL = '{"a": 1, "b": 2, "c": 3}\n'
+LATIN1_CSV = (
+    b"date,name,latitude,longitude\n"
+    b"2020-01-01,Barra da Lagoa,-27.574,-48.422\n"
+    b"2020-03-04,S\xe3o Paulo,-23.561,-46.645\n"
+    b"2020-04-05,Salta,-24.793:-65.408"
+)
 
 
 InsertTest = namedtuple(
@@ -121,6 +132,52 @@ def make_format_test(content, arg):
             expected_output="Inserting rows\n",
             should_error=False,
             expected_table_json=[{"rowid": 1, "a": "1", "b": "2", "c": "3"}],
+        ),
+        # --encoding - without it this should error:
+        InsertTest(
+            input_data=LATIN1_CSV,
+            cmd_args=["--no-detect-types", "--create", "--csv"],
+            table_exists=False,
+            expected_output="Inserting rows\n",
+            should_error=True,
+            expected_table_json=None,
+        ),
+        # --encoding - with it this should work:
+        InsertTest(
+            input_data=LATIN1_CSV,
+            cmd_args=[
+                "--no-detect-types",
+                "--create",
+                "--encoding",
+                "latin-1",
+                "--csv",
+            ],
+            table_exists=False,
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[
+                {
+                    "rowid": 1,
+                    "date": "2020-01-01",
+                    "name": "Barra da Lagoa",
+                    "latitude": "-27.574",
+                    "longitude": "-48.422",
+                },
+                {
+                    "rowid": 2,
+                    "date": "2020-03-04",
+                    "name": "São Paulo",
+                    "latitude": "-23.561",
+                    "longitude": "-46.645",
+                },
+                {
+                    "rowid": 3,
+                    "date": "2020-04-05",
+                    "name": "Salta",
+                    "latitude": "-24.793:-65.408",
+                    "longitude": None,
+                },
+            ],
         ),
         # Existing table, conflicting pk
         InsertTest(
@@ -220,7 +277,10 @@ def test_insert_against_datasette(
     httpx_mock.add_callback(custom_response)
 
     path = pathlib.Path(tmpdir) / "data.txt"
-    path.write_text(input_data)
+    if isinstance(input_data, str):
+        path.write_text(input_data)
+    else:
+        path.write_bytes(input_data)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -233,7 +293,6 @@ def test_insert_against_datasette(
             token,
         ]
         + cmd_args,
-        catch_exceptions=False,
     )
     if not should_error:
         assert result.exit_code == 0
