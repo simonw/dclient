@@ -5,7 +5,9 @@
 [![Tests](https://github.com/simonw/dclient/workflows/Test/badge.svg)](https://github.com/simonw/dclient/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/dclient/blob/master/LICENSE)
 
-A client CLI utility for [Datasette](https://datasette.io/) instances
+A client CLI utility for [Datasette](https://datasette.io/) instances.
+
+Much of the functionality requires Datasette 1.0a2 or higher.
 
 ## Things you can do with dclient
 
