@@ -6,7 +6,7 @@ import pathlib
 from sqlite_utils.utils import rows_from_file, Format, TypeTracker
 from .utils import token_for_url
 
-INSERT_BATCH_SIZE = 50
+INSERT_BATCH_SIZE = 100
 
 
 def get_config_dir():
