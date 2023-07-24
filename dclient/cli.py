@@ -98,6 +98,12 @@ def query(url_or_alias, sql, token):
     "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
 )
 @click.option("--create", is_flag=True, help="Create table if it does not exist")
+@click.option(
+    "pks",
+    "--pk",
+    multiple=True,
+    help="Columns to use as the primary key when creating the table",
+)
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")
 def insert(
@@ -110,6 +116,7 @@ def insert(
     format_nl,
     no_detect_types,
     create,
+    pks,
     token,
     silent,
 ):
@@ -155,8 +162,6 @@ def insert(
         fp = sys.stdin.buffer
         file_size = None
 
-    pathlib.Path(filepath)
-
     rows, format = rows_from_file(fp, format=format)
 
     first = True
@@ -196,7 +201,9 @@ def insert(
                             else:
                                 row[key] = float(value)
             first = False
-            _insert_batch(url, table, batch, token=token, create=create)
+            _insert_batch(
+                url=url, table=table, batch=batch, token=token, create=create, pks=pks
+            )
 
 
 @cli.group()
@@ -326,12 +333,17 @@ def _batches(iterable, size):
         yield batch
 
 
-def _insert_batch(url, table, batch, token, create):
+def _insert_batch(*, url, table, batch, token, create, pks):
     if create:
         data = {
             "table": table,
             "rows": batch,
         }
+        if pks:
+            if len(pks) == 1:
+                data["pk"] = pks[0]
+            else:
+                data["pks"] = pks
         url = "{}/-/create".format(url)
     else:
         data = {
