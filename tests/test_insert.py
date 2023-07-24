@@ -55,16 +55,25 @@ SIMPLE_CSV = "a,b,c\n1,2,3\n"
 
 
 InsertTest = namedtuple(
-    "InsertTest", "csv_data,cmd_args,expected_output,should_error,expected_table_json"
+    "InsertTest",
+    (
+        "csv_data",
+        "cmd_args",
+        "table_exists",
+        "expected_output",
+        "should_error",
+        "expected_table_json",
+    ),
 )
 
 
 @pytest.mark.parametrize(
-    "csv_data,cmd_args,expected_output,should_error,expected_table_json",
+    "csv_data,cmd_args,table_exists,expected_output,should_error,expected_table_json",
     (
         InsertTest(
             csv_data=SIMPLE_CSV,
             cmd_args=["--create"],
+            table_exists=False,
             expected_output="Inserting rows\n",
             should_error=False,
             expected_table_json=[{"rowid": 1, "a": 1, "b": 2, "c": 3}],
@@ -72,9 +81,37 @@ InsertTest = namedtuple(
         InsertTest(
             csv_data=SIMPLE_CSV,
             cmd_args=[],
+            table_exists=False,
             expected_output="Inserting rows\nError: Table not found: table1\n",
             should_error=True,
             expected_table_json=None,
+        ),
+        # Existing table, conflicting pk
+        InsertTest(
+            csv_data=SIMPLE_CSV,
+            cmd_args=[],
+            table_exists=True,
+            expected_output="Inserting rows\nUNIQUE constraint failed: table1.a\nError: UNIQUE constraint failed: table1.a\n",
+            should_error=True,
+            expected_table_json=[{"a": 1, "b": 2, "c": 3}, {"a": 4, "b": 5, "c": 6}],
+        ),
+        # Existing table, --replace
+        InsertTest(
+            csv_data="a,b,c\n1,2,4\n",
+            cmd_args=["--replace"],
+            table_exists=True,
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[{"a": 1, "b": 2, "c": 4}, {"a": 4, "b": 5, "c": 6}],
+        ),
+        # Existing table, --ignore
+        InsertTest(
+            csv_data="a,b,c\n1,2,4\n",
+            cmd_args=["--ignore"],
+            table_exists=True,
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[{"a": 1, "b": 2, "c": 3}, {"a": 4, "b": 5, "c": 6}],
         ),
     ),
 )
@@ -83,6 +120,7 @@ def test_insert_against_datasette(
     tmpdir,
     csv_data,
     cmd_args,
+    table_exists,
     expected_output,
     should_error,
     expected_table_json,
@@ -97,13 +135,25 @@ def test_insert_against_datasette(
         }
     )
     db = ds.add_memory_database("data")
+    loop = asyncio.get_event_loop()
+
     # Drop all tables in the database each time, because in-memory
     # databases persist in between test runs
-    drop_all_tables(db)
+    drop_all_tables(db, loop)
+
+    if table_exists:
+
+        async def run_table_exists():
+            await db.execute_write(
+                "create table table1 (a integer primary key, b integer, c integer)"
+            )
+            await db.execute_write(
+                "insert into table1 (a, b, c) values (1, 2, 3), (4, 5, 6)"
+            )
+
+        loop.run_until_complete(run_table_exists())
 
     token = ds.create_token("actor")
-
-    loop = asyncio.get_event_loop()
 
     # These are useful with pytest --pdb to see what happened
     datasette_requests = []
@@ -166,10 +216,9 @@ def test_insert_against_datasette(
         assert response.json() == expected_table_json
 
 
-def drop_all_tables(db):
+def drop_all_tables(db, loop):
     async def run():
         for table in await db.table_names():
             await db.execute_write("drop table {}".format(table))
 
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(run())
