@@ -113,6 +113,15 @@ def make_format_test(content, arg):
             should_error=True,
             expected_table_json=None,
         ),
+        # --no-detect-types
+        InsertTest(
+            input_data=SIMPLE_CSV,
+            cmd_args=["--no-detect-types", "--create"],
+            table_exists=False,
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[{"rowid": 1, "a": "1", "b": "2", "c": "3"}],
+        ),
         # Existing table, conflicting pk
         InsertTest(
             input_data=SIMPLE_CSV,
