@@ -41,4 +41,5 @@ maxdepth: 3
 queries
 aliases
 authentication
+inserting
 ```

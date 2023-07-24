@@ -37,7 +37,7 @@ cog.out(
 )
 ]]] -->
 ```
-Usage: dclient query [OPTIONS] URL SQL
+Usage: dclient query [OPTIONS] URL_OR_ALIAS SQL
 
   Run a SQL query against a Datasette database URL
 

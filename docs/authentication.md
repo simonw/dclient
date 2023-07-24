@@ -1,3 +1,5 @@
+(authentication)=
+
 # Authentication
 
 `dclient` can handle API tokens for Datasette instances that require authentication.

@@ -7,6 +7,13 @@
 
 A client CLI utility for [Datasette](https://datasette.io/) instances
 
+## Things you can do with dclient
+
+- Run SQL queries against Datasette and returning the results as JSON
+- Run queries against authenticated Datasette instances
+- Create aliases and store authentication tokens for convenient access to Datasette
+- Insert data into Datasette using the [insert API](https://docs.datasette.io/en/latest/json_api.html#the-json-write-api) (Datasette 1.0 alpha or higher)
+
 ## Installation
 
 Install this tool using `pip`:

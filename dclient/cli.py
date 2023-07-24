@@ -1,7 +1,11 @@
 import click
 import httpx
+import io
+import itertools
 import json
 import pathlib
+from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
+import sys
 from .utils import token_for_url
 
 
@@ -16,10 +20,10 @@ def cli():
 
 
 @cli.command()
-@click.argument("url")
+@click.argument("url_or_alias")
 @click.argument("sql")
 @click.option("--token", "-t", help="API token")
-def query(url, sql, token):
+def query(url_or_alias, sql, token):
     """
     Run a SQL query against a Datasette database URL
 
@@ -27,9 +31,11 @@ def query(url, sql, token):
     """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
-    if url in aliases:
-        url = aliases[url]
-    if not url.endswith(".json"):
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+    if not url_or_alias.endswith(".json"):
         url += ".json"
     if token is None:
         # Maybe there's a token in auth.json?
@@ -75,6 +81,159 @@ def query(url, sql, token):
 
     # Output results
     click.echo(json.dumps(response.json()["rows"], indent=2))
+
+
+@cli.command()
+@click.argument("url_or_alias")
+@click.argument("table")
+@click.argument(
+    "filepath", type=click.Path("rb", readable=True, allow_dash=True, dir_okay=False)
+)
+@click.option("format_csv", "--csv", is_flag=True, help="Input is CSV")
+@click.option("format_tsv", "--tsv", is_flag=True, help="Input is TSV")
+@click.option("format_json", "--json", is_flag=True, help="Input is JSON")
+@click.option("format_nl", "--nl", is_flag=True, help="Input is newline-delimited JSON")
+@click.option("--encoding", help="Character encoding for CSV/TSV")
+@click.option(
+    "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
+)
+@click.option(
+    "--replace", is_flag=True, help="Replace rows with a matching primary key"
+)
+@click.option("--ignore", is_flag=True, help="Ignore rows with a matching primary key")
+@click.option("--create", is_flag=True, help="Create table if it does not exist")
+@click.option(
+    "pks",
+    "--pk",
+    multiple=True,
+    help="Columns to use as the primary key when creating the table",
+)
+@click.option(
+    "--batch-size", type=int, default=100, help="Send rows in batches of this size"
+)
+@click.option("--token", "-t", help="API token")
+@click.option("--silent", is_flag=True, help="Don't output progress")
+def insert(
+    url_or_alias,
+    table,
+    filepath,
+    format_csv,
+    format_tsv,
+    format_json,
+    format_nl,
+    encoding,
+    no_detect_types,
+    replace,
+    ignore,
+    create,
+    pks,
+    batch_size,
+    token,
+    silent,
+):
+    """
+    Insert data into a remote Datasette instance
+
+    Example usage:
+
+    \b
+        dclient insert \\
+          https://private.datasette.cloud/data \\
+          mytable data.csv --pk id --create
+    """
+    aliases_file = get_config_dir() / "aliases.json"
+    aliases = _load_aliases(aliases_file)
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+
+    if token is None:
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+
+    format = None
+    if format_csv:
+        format = Format.CSV
+    elif format_tsv:
+        format = Format.TSV
+    elif format_json:
+        format = Format.JSON
+    elif format_nl:
+        format = Format.NL
+    if format is None and filepath == "-":
+        raise click.ClickException(
+            "An explicit format is required  - e.g. --csv "
+            "- when reading from standard input"
+        )
+
+    if filepath != "-":
+        file_size = pathlib.Path(filepath).stat().st_size
+        fp = open(filepath, "rb")
+    else:
+        fp = sys.stdin.buffer
+        file_size = None
+
+    try:
+        rows, format = rows_from_file(fp, format=format, encoding=encoding)
+    except Exception as ex:
+        raise click.ClickException(str(ex))
+
+    if format in (Format.JSON, Format.NL):
+        # Disable progress bar - it can't handle these formats
+        file_size = None
+        no_detect_types = True
+
+    first = True
+
+    with progressbar(
+        length=file_size,
+        label="Inserting rows",
+        silent=silent or (file_size is None),
+        show_percent=True,
+    ) as bar:
+        bytes_so_far = 0
+        for batch in _batches(rows, batch_size):
+            if file_size is not None:
+                try:
+                    bytes_consumed_so_far = fp.tell()
+                    new_bytes = bytes_consumed_so_far - bytes_so_far
+                    bar.update(new_bytes)
+                    bytes_so_far += new_bytes
+                except ValueError:
+                    # File has likely been closed, so fp.tell() fails
+                    pass
+            types = None
+            if first and not no_detect_types:
+                # Detect types on first batch
+                tracker = TypeTracker()
+                list(tracker.wrap(batch))
+                types = tracker.types
+                # Convert types
+                for row in batch:
+                    for key, value in row.items():
+                        if value is None:
+                            continue
+                        if types[key] == "integer":
+                            if not value:
+                                row[key] = None
+                            else:
+                                row[key] = int(value)
+                        elif types[key] == "float":
+                            if not value:
+                                row[key] = None
+                            else:
+                                row[key] = float(value)
+            first = False
+            _insert_batch(
+                url=url,
+                table=table,
+                batch=batch,
+                token=token,
+                create=create,
+                pks=pks,
+                replace=replace,
+                ignore=ignore,
+            )
 
 
 @cli.group()
@@ -194,3 +353,56 @@ def _load_auths(auth_file):
     else:
         auths = {}
     return auths
+
+
+def _batches(iterable, size):
+    iterable = iter(iterable)
+    while True:
+        batch = list(itertools.islice(iterable, size))
+        if not batch:
+            return
+        yield batch
+
+
+def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
+    if create:
+        data = {
+            "table": table,
+            "rows": batch,
+        }
+        if replace:
+            data["replace"] = True
+        if ignore:
+            data["ignore"] = True
+        if pks:
+            if len(pks) == 1:
+                data["pk"] = pks[0]
+            else:
+                data["pks"] = pks
+        url = "{}/-/create".format(url)
+    else:
+        data = {
+            "rows": batch,
+        }
+        if replace:
+            data["replace"] = True
+        if ignore:
+            data["ignore"] = True
+        url = "{}/{}/-/insert".format(url, table)
+    response = httpx.post(
+        url,
+        headers={
+            "Authorization": "Bearer {}".format(token),
+            "Content-Type": "application/json",
+        },
+        json=data,
+        timeout=40.0,
+    )
+    if str(response.status_code)[0] != "2":
+        # Is there an error we can show?
+        if "/json" in response.headers["content-type"]:
+            data = response.json()
+            if "errors" in data:
+                raise click.ClickException("\n".join(data["errors"]))
+        response.raise_for_status()
+    return response.json()

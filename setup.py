@@ -31,7 +31,7 @@ setup(
         "datasette": ["client = dclient.plugin"],
         "console_scripts": ["dclient = dclient.cli:cli"],
     },
-    install_requires=["click", "httpx"],
+    install_requires=["click", "httpx", "sqlite-utils"],
     extras_require={
         "test": [
             "pytest",
@@ -39,7 +39,7 @@ setup(
             "pytest-httpx",
             "cogapp",
             "pytest-mock",
-            "datasette",
+            "datasette>=1.0a2",
         ]
     },
     python_requires=">=3.7",
