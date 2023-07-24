@@ -1,4 +1,5 @@
 import asyncio
+from collections import namedtuple
 from click.testing import CliRunner
 from datasette.app import Datasette
 from dclient.cli import cli
@@ -50,7 +51,42 @@ def test_insert_mocked(httpx_mock, tmpdir):
     assert json.loads(request.read()) == {"rows": [{"a": 1, "b": 2, "c": 3}]}
 
 
-def test_insert_against_datasette(httpx_mock, tmpdir):
+SIMPLE_CSV = "a,b,c\n1,2,3\n"
+
+
+InsertTest = namedtuple(
+    "InsertTest", "csv_data,cmd_args,expected_output,should_error,expected_table_json"
+)
+
+
+@pytest.mark.parametrize(
+    "csv_data,cmd_args,expected_output,should_error,expected_table_json",
+    (
+        InsertTest(
+            csv_data=SIMPLE_CSV,
+            cmd_args=["--create"],
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[{"rowid": 1, "a": 1, "b": 2, "c": 3}],
+        ),
+        InsertTest(
+            csv_data=SIMPLE_CSV,
+            cmd_args=[],
+            expected_output="Inserting rows\nError: Table not found: table1\n",
+            should_error=True,
+            expected_table_json=None,
+        ),
+    ),
+)
+def test_insert_against_datasette(
+    httpx_mock,
+    tmpdir,
+    csv_data,
+    cmd_args,
+    expected_output,
+    should_error,
+    expected_table_json,
+):
     ds = Datasette(
         metadata={
             "permissions": {
@@ -60,16 +96,24 @@ def test_insert_against_datasette(httpx_mock, tmpdir):
             }
         }
     )
-    ds.add_memory_database("data")
+    db = ds.add_memory_database("data")
+    # Drop all tables in the database each time, because in-memory
+    # databases persist in between test runs
+    drop_all_tables(db)
 
     token = ds.create_token("actor")
 
     loop = asyncio.get_event_loop()
 
+    # These are useful with pytest --pdb to see what happened
+    datasette_requests = []
+    datasette_responses = []
+
     def custom_response(request: httpx.Request):
         # Need to run this in async loop, because dclient itself uses
         # sync HTTPX and not async HTTPX
         async def run():
+            datasette_requests.append(request)
             response = await ds.client.request(
                 request.method,
                 request.url.path,
@@ -77,18 +121,20 @@ def test_insert_against_datasette(httpx_mock, tmpdir):
                 headers=request.headers,
             )
             # Create a fresh response to avoid an error where stream has been consumed
-            return httpx.Response(
+            response = httpx.Response(
                 status_code=response.status_code,
                 headers=response.headers,
                 content=response.content,
             )
+            datasette_responses.append(response)
+            return response
 
         return loop.run_until_complete(run())
 
     httpx_mock.add_callback(custom_response)
 
     path = pathlib.Path(tmpdir) / "data.csv"
-    path.write_text("a,b,c\n1,2,3\n")
+    path.write_text(csv_data)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -100,16 +146,30 @@ def test_insert_against_datasette(httpx_mock, tmpdir):
             "--csv",
             "--token",
             token,
-            "--create",
-        ],
+        ]
+        + cmd_args,
         catch_exceptions=False,
     )
-    assert result.exit_code == 0
+    if not should_error:
+        assert result.exit_code == 0
+    else:
+        assert result.exit_code != 0
+    assert result.output == expected_output
 
-    # Datasette should have the new rows
-    async def fetch_table():
-        response = await ds.client.get("/data/table1.json?_shape=array")
-        return response
+    if expected_table_json:
 
-    response = loop.run_until_complete(fetch_table())
-    assert response.json() == [{"rowid": 1, "a": 1, "b": 2, "c": 3}]
+        async def fetch_table():
+            response = await ds.client.get("/data/table1.json?_shape=array")
+            return response
+
+        response = loop.run_until_complete(fetch_table())
+        assert response.json() == expected_table_json
+
+
+def drop_all_tables(db):
+    async def run():
+        for table in await db.table_names():
+            await db.execute_write("drop table {}".format(table))
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run())
