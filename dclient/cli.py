@@ -7,6 +7,7 @@ from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
 from .utils import token_for_url
 
+
 def get_config_dir():
     return pathlib.Path(click.get_app_dir("io.datasette.dclient"))
 
@@ -182,10 +183,14 @@ def insert(
         bytes_so_far = 0
         for batch in _batches(rows, batch_size):
             if file_size is not None:
-                bytes_consumed_so_far = fp.tell()
-                new_bytes = bytes_consumed_so_far - bytes_so_far
-                bar.update(new_bytes)
-                bytes_so_far += new_bytes
+                try:
+                    bytes_consumed_so_far = fp.tell()
+                    new_bytes = bytes_consumed_so_far - bytes_so_far
+                    bar.update(new_bytes)
+                    bytes_so_far += new_bytes
+                except ValueError:
+                    # File has likely been closed, so fp.tell() fails
+                    pass
             types = None
             if first and not no_detect_types:
                 # Detect types on first batch
