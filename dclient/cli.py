@@ -97,6 +97,10 @@ def query(url_or_alias, sql, token):
 @click.option(
     "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
 )
+@click.option(
+    "--replace", is_flag=True, help="Replace rows with a matching primary key"
+)
+@click.option("--ignore", is_flag=True, help="Ignore rows with a matching primary key")
 @click.option("--create", is_flag=True, help="Create table if it does not exist")
 @click.option(
     "pks",
@@ -115,6 +119,8 @@ def insert(
     format_json,
     format_nl,
     no_detect_types,
+    replace,
+    ignore,
     create,
     pks,
     token,
@@ -202,7 +208,14 @@ def insert(
                                 row[key] = float(value)
             first = False
             _insert_batch(
-                url=url, table=table, batch=batch, token=token, create=create, pks=pks
+                url=url,
+                table=table,
+                batch=batch,
+                token=token,
+                create=create,
+                pks=pks,
+                replace=replace,
+                ignore=ignore,
             )
 
 
@@ -333,12 +346,16 @@ def _batches(iterable, size):
         yield batch
 
 
-def _insert_batch(*, url, table, batch, token, create, pks):
+def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
     if create:
         data = {
             "table": table,
             "rows": batch,
         }
+        if replace:
+            data["replace"] = True
+        if ignore:
+            data["ignore"] = True
         if pks:
             if len(pks) == 1:
                 data["pk"] = pks[0]
@@ -349,6 +366,10 @@ def _insert_batch(*, url, table, batch, token, create, pks):
         data = {
             "rows": batch,
         }
+        if replace:
+            data["replace"] = True
+        if ignore:
+            data["ignore"] = True
         url = "{}/{}/-/insert".format(url, table)
     response = httpx.post(
         url,
@@ -359,5 +380,11 @@ def _insert_batch(*, url, table, batch, token, create, pks):
         json=data,
         timeout=40.0,
     )
-    response.raise_for_status()
+    if str(response.status_code)[0] != "2":
+        # Is there an error we can show?
+        if "/json" in response.headers["content-type"]:
+            data = response.json()
+            if "errors" in data:
+                raise click.ClickException("\n".join(data["errors"]))
+        response.raise_for_status()
     return response.json()
