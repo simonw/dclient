@@ -3,7 +3,8 @@ import httpx
 import itertools
 import json
 import pathlib
-from sqlite_utils.utils import rows_from_file, Format, TypeTracker
+from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
+import sys
 from .utils import token_for_url
 
 INSERT_BATCH_SIZE = 100
@@ -86,7 +87,9 @@ def query(url_or_alias, sql, token):
 @cli.command()
 @click.argument("url_or_alias")
 @click.argument("table")
-@click.argument("file", type=click.File("rb"))
+@click.argument(
+    "filepath", type=click.Path("rb", readable=True, allow_dash=True, dir_okay=False)
+)
 @click.option("format_csv", "--csv", is_flag=True, help="Input is CSV")
 @click.option("format_tsv", "--tsv", is_flag=True, help="Input is TSV")
 @click.option("format_json", "--json", is_flag=True, help="Input is JSON")
@@ -96,10 +99,11 @@ def query(url_or_alias, sql, token):
 )
 @click.option("--create", is_flag=True, help="Create table if it does not exist")
 @click.option("--token", "-t", help="API token")
+@click.option("--silent", is_flag=True, help="Don't output progress")
 def insert(
     url_or_alias,
     table,
-    file,
+    filepath,
     format_csv,
     format_tsv,
     format_json,
@@ -107,6 +111,7 @@ def insert(
     no_detect_types,
     create,
     token,
+    silent,
 ):
     """
     Insert data into a remote Datasette instance
@@ -116,7 +121,7 @@ def insert(
     \b
         dclient insert \\
           https://private.datasette.cloud/data \\
-          mytable data.csv
+          mytable data.csv --pk id --create
     """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
@@ -128,7 +133,6 @@ def insert(
     if token is None:
         token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
 
-    print(url, table)
     format = None
     if format_csv:
         format = Format.CSV
@@ -138,40 +142,61 @@ def insert(
         format = Format.JSON
     elif format_nl:
         format = Format.NL
-    if format is None and file.name == "<stdin>":
+    if format is None and filepath == "-":
         raise click.ClickException(
             "An explicit format is required  - e.g. --csv "
             "- when reading from standard input"
         )
-    rows, format = rows_from_file(file, format=format)
+
+    if filepath != "-":
+        file_size = pathlib.Path(filepath).stat().st_size
+        fp = open(filepath, "rb")
+    else:
+        fp = sys.stdin.buffer
+        file_size = None
+
+    pathlib.Path(filepath)
+
+    rows, format = rows_from_file(fp, format=format)
 
     first = True
 
-    for batch in _batches(rows, INSERT_BATCH_SIZE):
-        types = None
-        if first and not no_detect_types:
-            # Detect types on first batch
-            tracker = TypeTracker()
-            list(tracker.wrap(batch))
-            types = tracker.types
-            # Convert types
-            for row in batch:
-                for key, value in row.items():
-                    if value is None:
-                        continue
-                    if types[key] == "integer":
-                        if not value:
-                            row[key] = None
-                        else:
-                            row[key] = int(value)
-                    elif types[key] == "float":
-                        if not value:
-                            row[key] = None
-                        else:
-                            row[key] = float(value)
-        first = False
-        response = _insert_batch(url, table, batch, token=token, create=create)
-        print(response)
+    with progressbar(
+        length=file_size,
+        label="Inserting rows",
+        silent=silent or (file_size is None),
+        show_percent=True,
+    ) as bar:
+        bytes_so_far = 0
+        for batch in _batches(rows, INSERT_BATCH_SIZE):
+            if file_size is not None:
+                bytes_consumed_so_far = fp.tell()
+                new_bytes = bytes_consumed_so_far - bytes_so_far
+                bar.update(new_bytes)
+                bytes_so_far += new_bytes
+            types = None
+            if first and not no_detect_types:
+                # Detect types on first batch
+                tracker = TypeTracker()
+                list(tracker.wrap(batch))
+                types = tracker.types
+                # Convert types
+                for row in batch:
+                    for key, value in row.items():
+                        if value is None:
+                            continue
+                        if types[key] == "integer":
+                            if not value:
+                                row[key] = None
+                            else:
+                                row[key] = int(value)
+                        elif types[key] == "float":
+                            if not value:
+                                row[key] = None
+                            else:
+                                row[key] = float(value)
+            first = False
+            _insert_batch(url, table, batch, token=token, create=create)
 
 
 @cli.group()
