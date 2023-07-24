@@ -39,7 +39,7 @@ setup(
             "pytest-httpx",
             "cogapp",
             "pytest-mock",
-            "datasette",
+            "datasette>=1.0a2",
         ]
     },
     python_requires=">=3.7",
