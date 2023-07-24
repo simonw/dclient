@@ -7,9 +7,6 @@ from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
 from .utils import token_for_url
 
-INSERT_BATCH_SIZE = 100
-
-
 def get_config_dir():
     return pathlib.Path(click.get_app_dir("io.datasette.dclient"))
 
@@ -108,6 +105,9 @@ def query(url_or_alias, sql, token):
     multiple=True,
     help="Columns to use as the primary key when creating the table",
 )
+@click.option(
+    "--batch-size", type=int, default=100, help="Send rows in batches of this size"
+)
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")
 def insert(
@@ -123,6 +123,7 @@ def insert(
     ignore,
     create,
     pks,
+    batch_size,
     token,
     silent,
 ):
@@ -179,7 +180,7 @@ def insert(
         show_percent=True,
     ) as bar:
         bytes_so_far = 0
-        for batch in _batches(rows, INSERT_BATCH_SIZE):
+        for batch in _batches(rows, batch_size):
             if file_size is not None:
                 bytes_consumed_so_far = fp.tell()
                 new_bytes = bytes_consumed_so_far - bytes_so_far
