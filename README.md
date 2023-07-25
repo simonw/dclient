@@ -31,7 +31,14 @@ datasette install dclient
 ```bash
 dclient query https://latest.datasette.io/fixtures "select * from facetable limit 1"
 ```
-
+To shorten that, create an alias:
+```bash
+dclient alias add fixtures https://latest.datasette.io/fixtures
+```
+Then run it like this instead:
+```bash
+dclient query fixtures "select * from facetable limit 1"
+```
 ## Documentation
 
 Visit **[dclient.datasette.io](https://dclient.datasette.io)** for full documentation on using this tool.
