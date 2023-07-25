@@ -69,3 +69,46 @@ You can disable this and have every value treated as a string using `--no-detect
 - `--pk id` - set a primary key (for if the table is being created)
 
 If you use `--create` a table will be created with rows to match the columns in your uploaded data - using the correctly detected types, unless you use `--no-detect-types` in which case every column will be of type `text`.
+
+## dclient insert --help
+<!-- [[[cog
+import cog
+from dclient import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["insert", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient insert [OPTIONS] URL_OR_ALIAS TABLE FILEPATH
+
+  Insert data into a remote Datasette instance
+
+  Example usage:
+
+      dclient insert \
+        https://private.datasette.cloud/data \
+        mytable data.csv --pk id --create
+
+Options:
+  --csv                 Input is CSV
+  --tsv                 Input is TSV
+  --json                Input is JSON
+  --nl                  Input is newline-delimited JSON
+  --encoding TEXT       Character encoding for CSV/TSV
+  --no-detect-types     Don't detect column types for CSV/TSV
+  --replace             Replace rows with a matching primary key
+  --ignore              Ignore rows with a matching primary key
+  --create              Create table if it does not exist
+  --pk TEXT             Columns to use as the primary key when creating the
+                        table
+  --batch-size INTEGER  Send rows in batches of this size
+  -t, --token TEXT      API token
+  --silent              Don't output progress
+  --help                Show this message and exit.
+
+```
+<!-- [[[end]]] -->
