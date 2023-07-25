@@ -22,7 +22,7 @@ def cli():
 @cli.command()
 @click.argument("url_or_alias")
 @click.argument("sql")
-@click.option("--token", "-t", help="API token")
+@click.option("--token", help="API token")
 def query(url_or_alias, sql, token):
     """
     Run a SQL query against a Datasette database URL

@@ -44,8 +44,8 @@ Usage: dclient query [OPTIONS] URL_OR_ALIAS SQL
   Returns a JSON array of objects
 
 Options:
-  -t, --token TEXT  API token
-  --help            Show this message and exit.
+  --token TEXT  API token
+  --help        Show this message and exit.
 
 ```
 <!-- [[[end]]] -->
