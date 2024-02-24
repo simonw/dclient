@@ -42,5 +42,5 @@ setup(
             "datasette>=1.0a2",
         ]
     },
-    python_requires=">=3.7",
+    python_requires=">=3.8",
 )
