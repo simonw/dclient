@@ -219,7 +219,7 @@ def test_insert_against_datasette(
     expected_table_json,
 ):
     ds = Datasette(
-        metadata={
+        config={
             "permissions": {
                 "create-table": {"id": "*"},
                 "insert-row": {"id": "*"},
