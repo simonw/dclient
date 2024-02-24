@@ -1,11 +1,10 @@
 import click
 import httpx
-import io
-import itertools
 import json
 import pathlib
 from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
+import time
 from .utils import token_for_url
 
 
@@ -111,6 +110,9 @@ def query(url_or_alias, sql, token):
 @click.option(
     "--batch-size", type=int, default=100, help="Send rows in batches of this size"
 )
+@click.option(
+    "--interval", type=float, default=None, help="Send batch at least every X seconds"
+)
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")
 def insert(
@@ -128,6 +130,7 @@ def insert(
     create,
     pks,
     batch_size,
+    interval,
     token,
     silent,
 ):
@@ -192,7 +195,7 @@ def insert(
         show_percent=True,
     ) as bar:
         bytes_so_far = 0
-        for batch in _batches(rows, batch_size):
+        for batch in _batches(rows, batch_size, interval=interval):
             if file_size is not None:
                 try:
                     bytes_consumed_so_far = fp.tell()
@@ -355,13 +358,22 @@ def _load_auths(auth_file):
     return auths
 
 
-def _batches(iterable, size):
+def _batches(iterable, size, interval=None):
     iterable = iter(iterable)
+    last_yield_time = time.time()
     while True:
-        batch = list(itertools.islice(iterable, size))
+        batch = []
+        for _ in range(size):
+            try:
+                batch.append(next(iterable))
+            except StopIteration:
+                break
+            if interval is not None and time.time() - last_yield_time >= interval:
+                break
         if not batch:
             return
         yield batch
+        last_yield_time = time.time()
 
 
 def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
