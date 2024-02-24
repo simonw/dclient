@@ -304,7 +304,6 @@ def stream(
                     and buffer
                 ):
                     await post_buffer(buffer, client)
-                    buffer.clear()
                     last_post_time = asyncio.get_running_loop().time()
 
             # Post any remaining items
