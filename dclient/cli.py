@@ -1,11 +1,12 @@
+import asyncio
 import click
 import httpx
-import io
 import itertools
 import json
 import pathlib
 from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
+import threading
 from .utils import token_for_url
 
 
@@ -236,6 +237,82 @@ def insert(
             )
 
 
+@cli.command()
+@click.argument("url_or_alias")
+@click.argument("table")
+@click.option(
+    "--replace", is_flag=True, help="Replace rows with a matching primary key"
+)
+@click.option("--ignore", is_flag=True, help="Ignore rows with a matching primary key")
+@click.option("--create", is_flag=True, help="Create table if it does not exist")
+@click.option(
+    "pks",
+    "--pk",
+    multiple=True,
+    help="Columns to use as the primary key when creating the table",
+)
+@click.option(
+    "--batch-size", type=int, default=100, help="Send rows in batches of this size"
+)
+@click.option(
+    "--interval",
+    type=float,
+    default=10,
+    help="Minimum interval between posts in seconds",
+)
+@click.option("--token", "-t", help="API token")
+def stream(
+    url_or_alias, table, replace, ignore, create, pks, batch_size, interval, token
+):
+    """
+    Stream newline-delimited JSON sent to standard input to a Datasette instance
+    """
+    aliases_file = get_config_dir() / "aliases.json"
+    aliases = _load_aliases(aliases_file)
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+
+    if token is None:
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+
+    async def post_buffer(buffer, client):
+        if buffer:
+            await _async_insert_batch(
+                url=url,
+                table=table,
+                batch=buffer,
+                token=token,
+                create=create,
+                pks=pks,
+                replace=replace,
+                ignore=ignore,
+                client=client,
+            )
+            buffer.clear()
+
+    async def stream():
+        buffer = []
+        last_post_time = asyncio.get_running_loop().time()
+        async with httpx.AsyncClient() as client:
+            for line in sys.stdin:
+                item = json.loads(line)
+                buffer.append(item)
+                if len(buffer) >= batch_size or (
+                    asyncio.get_running_loop().time() - last_post_time >= interval
+                    and buffer
+                ):
+                    await post_buffer(buffer, client)
+                    buffer.clear()
+                    last_post_time = asyncio.get_running_loop().time()
+
+            # Post any remaining items
+            await post_buffer(buffer, client)
+
+    asyncio.run(stream())
+
+
 @cli.group()
 def alias():
     "Manage aliases for different instances"
@@ -365,6 +442,38 @@ def _batches(iterable, size):
 
 
 def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
+    url, json_body, headers = _build_request(
+        url, table, batch, token, create, pks, replace, ignore
+    )
+    response = httpx.post(
+        url,
+        headers=headers,
+        json=json_body,
+        timeout=40.0,
+    )
+    if str(response.status_code)[0] != "2":
+        # Is there an error we can show?
+        if "/json" in response.headers["content-type"]:
+            data = response.json()
+            if "errors" in data:
+                raise click.ClickException("\n".join(data["errors"]))
+        response.raise_for_status()
+    return response.json()
+
+
+async def _async_insert_batch(
+    *, url, table, batch, token, create, pks, replace, ignore, client
+):
+    url, json_body, headers = _build_request(
+        url, table, batch, token, create, pks, replace, ignore
+    )
+    response = await client.post(url, json=json_body, headers=headers, timeout=40.0)
+    response.raise_for_status()
+    return response.json()
+
+
+def _build_request(url, table, batch, token, create, pks, replace, ignore):
+    # Returns (url, json_body, headers)
     if create:
         data = {
             "table": table,
@@ -389,20 +498,11 @@ def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
         if ignore:
             data["ignore"] = True
         url = "{}/{}/-/insert".format(url, table)
-    response = httpx.post(
+    return (
         url,
-        headers={
+        data,
+        {
             "Authorization": "Bearer {}".format(token),
             "Content-Type": "application/json",
         },
-        json=data,
-        timeout=40.0,
     )
-    if str(response.status_code)[0] != "2":
-        # Is there an error we can show?
-        if "/json" in response.headers["content-type"]:
-            data = response.json()
-            if "errors" in data:
-                raise click.ClickException("\n".join(data["errors"]))
-        response.raise_for_status()
-    return response.json()
