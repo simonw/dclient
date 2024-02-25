@@ -6,9 +6,9 @@ import pytest
 
 def test_plugin_help():
     runner = CliRunner()
-    result = runner.invoke(cli, ["client", "--help"])
+    result = runner.invoke(cli, ["dc", "--help"])
     assert result.exit_code == 0
-    assert "Usage: cli client" in result.output
+    assert "Usage: cli dc" in result.output
     bits = result.output.split("Commands:")
     assert "alias" in bits[1]
     assert "query" in bits[1]

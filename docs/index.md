@@ -21,10 +21,10 @@ If you also have Datasette installed in the same environment it will register it
 ```bash
 datasette install dclient
 ```
-This means you can run any of these commands using `datasette client` instead, like this:
+This means you can run any of these commands using `datasette dt` instead, like this:
 ```bash
-datasette client --help
-datasette client query https://latest.datasette.io/fixtures "select * from facetable limit 1"
+datasette dc --help
+datasette dc query https://latest.datasette.io/fixtures "select * from facetable limit 1"
 ```
 You can install it into Datasette this way using:
 
