@@ -56,6 +56,10 @@ Usage: dclient alias list [OPTIONS]
 
   List aliases
 
+  Example usage:
+
+      dclient aliases list
+
 Options:
   --json  Output raw JSON
   --help  Show this message and exit.
@@ -78,6 +82,14 @@ Usage: dclient alias add [OPTIONS] NAME URL
 
   Add an alias
 
+  Example usage:
+
+      dclient alias add content https://datasette.io/content
+
+  Then:
+
+      dclient query content 'select * from news limit 3'
+
 Options:
   --help  Show this message and exit.
 
@@ -98,6 +110,10 @@ cog.out(
 Usage: dclient alias remove [OPTIONS] NAME
 
   Remove an alias
+
+  Example usage:
+
+      dclient alias remove content
 
 Options:
   --help  Show this message and exit.

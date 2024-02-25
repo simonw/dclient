@@ -43,6 +43,12 @@ Usage: dclient query [OPTIONS] URL_OR_ALIAS SQL
 
   Returns a JSON array of objects
 
+  Example usage:
+
+      dclient query \
+        https://datasette.io/content \
+        'select * from news limit 10'
+
 Options:
   --token TEXT  API token
   --help        Show this message and exit.

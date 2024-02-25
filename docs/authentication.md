@@ -101,6 +101,10 @@ Usage: dclient auth list [OPTIONS]
 
   List stored API tokens
 
+  Example usage:
+
+      dclient auth list
+
 Options:
   --help  Show this message and exit.
 
@@ -121,6 +125,10 @@ cog.out(
 Usage: dclient auth remove [OPTIONS] ALIAS_OR_URL
 
   Remove the API token for an alias or URL
+
+  Example usage:
+
+      dclient auth remove https://datasette.io/content
 
 Options:
   --help  Show this message and exit.

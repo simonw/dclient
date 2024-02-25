@@ -27,6 +27,13 @@ def query(url_or_alias, sql, token):
     Run a SQL query against a Datasette database URL
 
     Returns a JSON array of objects
+
+    Example usage:
+
+    \b
+        dclient query \\
+          https://datasette.io/content \\
+          'select * from news limit 10'
     """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
@@ -247,7 +254,14 @@ def alias():
 @alias.command(name="list")
 @click.option("_json", "--json", is_flag=True, help="Output raw JSON")
 def list_(_json):
-    "List aliases"
+    """
+    List aliases
+
+    Example usage:
+
+    \b
+        dclient aliases list
+    """
     aliases_file = get_config_dir() / "aliases.json"
     aliases = _load_aliases(aliases_file)
     if _json:
@@ -261,7 +275,18 @@ def list_(_json):
 @click.argument("name")
 @click.argument("url")
 def alias_add(name, url):
-    "Add an alias"
+    """
+    Add an alias
+
+    Example usage:
+
+    \b
+        dclient alias add content https://datasette.io/content
+
+    Then:
+
+        dclient query content 'select * from news limit 3'
+    """
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     aliases_file = config_dir / "aliases.json"
@@ -273,7 +298,14 @@ def alias_add(name, url):
 @alias.command(name="remove")
 @click.argument("name")
 def alias_remove(name):
-    "Remove an alias"
+    """
+    Remove an alias
+
+    Example usage:
+
+    \b
+        dclient alias remove content
+    """
     config_dir = get_config_dir()
     aliases_file = config_dir / "aliases.json"
     aliases = _load_aliases(aliases_file)
@@ -318,7 +350,14 @@ def auth_add(alias_or_url, token):
 
 @auth.command(name="list")
 def auth_list():
-    "List stored API tokens"
+    """
+    List stored API tokens
+
+    Example usage:
+
+    \b
+        dclient auth list
+    """
     auths_file = get_config_dir() / "auth.json"
     click.echo("Tokens file: {}".format(auths_file))
     auths = _load_auths(auths_file)
@@ -331,7 +370,14 @@ def auth_list():
 @auth.command(name="remove")
 @click.argument("alias_or_url")
 def auth_remove(alias_or_url):
-    "Remove the API token for an alias or URL"
+    """
+    Remove the API token for an alias or URL
+
+    Example usage:
+
+    \b
+        dclient auth remove https://datasette.io/content
+    """
     config_dir = get_config_dir()
     auth_file = config_dir / "auth.json"
     auths = _load_auths(auth_file)
