@@ -111,7 +111,7 @@ def query(url_or_alias, sql, token):
     "--batch-size", type=int, default=100, help="Send rows in batches of this size"
 )
 @click.option(
-    "--interval", type=float, default=None, help="Send batch at least every X seconds"
+    "--interval", type=float, default=10, help="Send batch at least every X seconds"
 )
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")

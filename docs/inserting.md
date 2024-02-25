@@ -7,7 +7,9 @@ First you'll need to {ref}`authenticate <authentication>` with the instance.
 To insert data from a `data.csv` file into a table called `my_table`, creating that table if it does not exist:
 
 ```bash
-dclient insert https://my-private-space.datasette.cloud/data my_table data.csv --create
+dclient insert \
+  https://my-private-space.datasette.cloud/data \
+  my_table data.csv --create
 ```
 You can also pipe data into standard input:
 ```bash
@@ -15,6 +17,26 @@ curl -s 'https://api.github.com/repos/simonw/dclient/issues' | \
   dclient insert \
     https://my-private-space.datasette.cloud/data \
     issues - --create
+```
+
+## Streaming data
+
+`dclient insert` works for streaming data as well.
+
+If you have a log file containing newline-delimited JSON you can tail it and send it to a Datasette instance like this:
+```bash
+tail -f log.jsonl | \
+  dclient insert https://my-private-space.datasette.cloud/data logs - --nl
+```
+When reading from standard input (filename `-`) you are required to specify the format. In this example that's `--nl` for newline-delimited JSON. `--csv` and `--tsv` are supported for streaming as well, but `--json` is not.
+
+In streaming mode records default to being sent to the server every 100 records or every 10 seconds, whichever comes first. You can adjust these values using the `--batch-size` and `--interval` settings. For example, here's how to send every 10 records or if 5 seconds has passed since the last time data was sent to the server:
+
+```bash
+tail -f log.jsonl | dclient insert \
+  https://my-private-space.datasette.cloud/data logs - --nl --create \
+  --batch-size 10 \
+  --interval 5
 ```
 
 ## Supported formats
@@ -106,6 +128,7 @@ Options:
   --pk TEXT             Columns to use as the primary key when creating the
                         table
   --batch-size INTEGER  Send rows in batches of this size
+  --interval FLOAT      Send batch at least every X seconds
   -t, --token TEXT      API token
   --silent              Don't output progress
   --help                Show this message and exit.
