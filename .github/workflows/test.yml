@@ -25,3 +25,6 @@ jobs:
     - name: Run tests
       run: |
         pytest
+    - name: Check if cog needs to run
+      run: |
+        cog --check docs/*.md
