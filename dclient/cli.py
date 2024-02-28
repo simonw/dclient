@@ -130,7 +130,12 @@ def query(url_or_alias, sql, token, verbose):
 )
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")
-@click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request and response")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Verbose output: show HTTP request and response",
+)
 def insert(
     url_or_alias,
     table,
@@ -257,6 +262,41 @@ def insert(
                 ignore=ignore,
                 verbose=verbose,
             )
+
+
+@cli.command()
+@click.argument("url_or_alias")
+@click.option("--token", help="API token")
+def actor(url_or_alias, token):
+    """
+    Show the actor represented by an API token
+
+    Example usage:
+
+    \b
+        dclient actor https://latest.datasette.io/fixtures
+    """
+    aliases_file = get_config_dir() / "aliases.json"
+    aliases = _load_aliases(aliases_file)
+    if url_or_alias in aliases:
+        url = aliases[url_or_alias]
+    else:
+        url = url_or_alias
+
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise click.ClickException("Invalid URL: " + url)
+
+    if token is None:
+        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+
+    url_bits = url.split("/")
+    url_bits[-1] = "-/actor.json"
+    actor_url = "/".join(url_bits)
+    response = httpx.get(
+        actor_url, headers={"Authorization": "Bearer {}".format(token)}, timeout=40.0
+    )
+    response.raise_for_status()
+    click.echo(json.dumps(response.json(), indent=4))
 
 
 @cli.group()

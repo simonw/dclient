@@ -28,7 +28,21 @@ To delete the token for a specific URL, run `auth remove`:
 ```bash
 dclient auth remove https://latest.datasette.io/
 ```
+## Testing a token
 
+The `dclient actor` command can be used to test a token, retrieving the actor that the token represents.
+```bash
+dclient actor https://latest.datasette.io/content
+```
+The output looks like this:
+```json
+{
+    "actor": {
+        "id": "root",
+        "token": "dstok"
+    }
+}
+```
 
 ## dclient auth --help
 <!-- [[[cog
@@ -132,6 +146,32 @@ Usage: dclient auth remove [OPTIONS] ALIAS_OR_URL
 
 Options:
   --help  Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+## dclient actor --help
+
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["actor", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient actor [OPTIONS] URL_OR_ALIAS
+
+  Show the actor represented by an API token
+
+  Example usage:
+
+      dclient actor https://latest.datasette.io/fixtures
+
+Options:
+  --token TEXT  API token
+  --help        Show this message and exit.
 
 ```
 <!-- [[[end]]] -->
