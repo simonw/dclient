@@ -133,6 +133,7 @@ Options:
   --interval FLOAT      Send batch at least every X seconds
   -t, --token TEXT      API token
   --silent              Don't output progress
+  -v, --verbose         Verbose output: show HTTP request and response
   --help                Show this message and exit.
 
 ```

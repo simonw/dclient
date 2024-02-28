@@ -4,8 +4,10 @@ import json
 import pathlib
 from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
+import textwrap
 import time
 from .utils import token_for_url
+import urllib
 
 
 def get_config_dir():
@@ -22,7 +24,8 @@ def cli():
 @click.argument("url_or_alias")
 @click.argument("sql")
 @click.option("--token", help="API token")
-def query(url_or_alias, sql, token):
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request")
+def query(url_or_alias, sql, token, verbose):
     """
     Run a SQL query against a Datasette database URL
 
@@ -49,7 +52,11 @@ def query(url_or_alias, sql, token):
     headers = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    response = httpx.get(url, params={"sql": sql, "_shape": "objects"}, headers=headers)
+    params = {"sql": sql, "_shape": "objects"}
+    if verbose:
+        click.echo(url + "?" + urllib.parse.urlencode(params), err=True)
+    response = httpx.get(url, params=params, headers=headers)
+
     if response.status_code != 200:
         # Is it valid JSON?
         try:
@@ -123,6 +130,7 @@ def query(url_or_alias, sql, token):
 )
 @click.option("--token", "-t", help="API token")
 @click.option("--silent", is_flag=True, help="Don't output progress")
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request and response")
 def insert(
     url_or_alias,
     table,
@@ -142,6 +150,7 @@ def insert(
     interval,
     token,
     silent,
+    verbose,
 ):
     """
     Insert data into a remote Datasette instance
@@ -246,6 +255,7 @@ def insert(
                 pks=pks,
                 replace=replace,
                 ignore=ignore,
+                verbose=verbose,
             )
 
 
@@ -425,7 +435,9 @@ def _batches(iterable, size, interval=None):
         last_yield_time = time.time()
 
 
-def _insert_batch(*, url, table, batch, token, create, alter, pks, replace, ignore):
+def _insert_batch(
+    *, url, table, batch, token, create, alter, pks, replace, ignore, verbose
+):
     if create:
         data = {
             "table": table,
@@ -454,6 +466,9 @@ def _insert_batch(*, url, table, batch, token, create, alter, pks, replace, igno
         if alter:
             data["alter"] = True
         url = "{}/{}/-/insert".format(url, table)
+    if verbose:
+        click.echo("POST {}".format(url), err=True)
+        click.echo(textwrap.indent(json.dumps(data, indent=2), "  "), err=True)
     response = httpx.post(
         url,
         headers={
@@ -463,6 +478,8 @@ def _insert_batch(*, url, table, batch, token, create, alter, pks, replace, igno
         json=data,
         timeout=40.0,
     )
+    if verbose:
+        click.echo(str(response), err=True)
     if str(response.status_code)[0] != "2":
         # Is there an error we can show?
         if "/json" in response.headers["content-type"]:
@@ -470,4 +487,7 @@ def _insert_batch(*, url, table, batch, token, create, alter, pks, replace, igno
             if "errors" in data:
                 raise click.ClickException("\n".join(data["errors"]))
         response.raise_for_status()
-    return response.json()
+    response_data = response.json()
+    if verbose:
+        click.echo(textwrap.indent(json.dumps(response_data, indent=2), "  "), err=True)
+    return response_data
