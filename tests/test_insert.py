@@ -206,6 +206,27 @@ def make_format_test(content, arg):
             should_error=False,
             expected_table_json=[{"a": 1, "b": 2, "c": 3}, {"a": 4, "b": 5, "c": 6}],
         ),
+        # Existing table without alter should fail
+        InsertTest(
+            input_data="a,b,c,d\n1,2,4,5\n",
+            cmd_args=["--ignore"],
+            table_exists=True,
+            expected_output="Inserting rows\nError: Row 0 has invalid columns: d\n",
+            should_error=True,
+            expected_table_json=[{"a": 1, "b": 2, "c": 3}, {"a": 4, "b": 5, "c": 6}],
+        ),
+        # Existing table with --alter should work
+        InsertTest(
+            input_data="a,b,c,d\n1,2,4,5\n",
+            cmd_args=["--replace", "--alter"],
+            table_exists=True,
+            expected_output="Inserting rows\n",
+            should_error=False,
+            expected_table_json=[
+                {"a": 1, "b": 2, "c": 4, "d": 5},
+                {"a": 4, "b": 5, "c": 6, "d": None},
+            ],
+        ),
     ),
 )
 def test_insert_against_datasette(
@@ -224,6 +245,7 @@ def test_insert_against_datasette(
                 "create-table": {"id": "*"},
                 "insert-row": {"id": "*"},
                 "update-row": {"id": "*"},
+                "alter-table": {"id": "*"},
             }
         }
     )

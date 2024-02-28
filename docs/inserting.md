@@ -88,6 +88,7 @@ You can disable this and have every value treated as a string using `--no-detect
 - `--create` - create the table if it doesn't already exist
 - `--replace` - replace any rows with a matching primary key
 - `--ignore` - ignore any rows with a matching existing primary key
+- `--alter` - alter table to add any columns that are missing
 - `--pk id` - set a primary key (for if the table is being created)
 
 If you use `--create` a table will be created with rows to match the columns in your uploaded data - using the correctly detected types, unless you use `--no-detect-types` in which case every column will be of type `text`.
@@ -125,6 +126,7 @@ Options:
   --replace             Replace rows with a matching primary key
   --ignore              Ignore rows with a matching primary key
   --create              Create table if it does not exist
+  --alter               Alter table to add any missing columns
   --pk TEXT             Columns to use as the primary key when creating the
                         table
   --batch-size INTEGER  Send rows in batches of this size

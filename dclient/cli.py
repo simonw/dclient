@@ -108,6 +108,7 @@ def query(url_or_alias, sql, token):
 )
 @click.option("--ignore", is_flag=True, help="Ignore rows with a matching primary key")
 @click.option("--create", is_flag=True, help="Create table if it does not exist")
+@click.option("--alter", is_flag=True, help="Alter table to add any missing columns")
 @click.option(
     "pks",
     "--pk",
@@ -135,6 +136,7 @@ def insert(
     replace,
     ignore,
     create,
+    alter,
     pks,
     batch_size,
     interval,
@@ -240,6 +242,7 @@ def insert(
                 batch=batch,
                 token=token,
                 create=create,
+                alter=alter,
                 pks=pks,
                 replace=replace,
                 ignore=ignore,
@@ -422,7 +425,7 @@ def _batches(iterable, size, interval=None):
         last_yield_time = time.time()
 
 
-def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
+def _insert_batch(*, url, table, batch, token, create, alter, pks, replace, ignore):
     if create:
         data = {
             "table": table,
@@ -432,6 +435,8 @@ def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
             data["replace"] = True
         if ignore:
             data["ignore"] = True
+        if alter:
+            data["alter"] = True
         if pks:
             if len(pks) == 1:
                 data["pk"] = pks[0]
@@ -446,6 +451,8 @@ def _insert_batch(*, url, table, batch, token, create, pks, replace, ignore):
             data["replace"] = True
         if ignore:
             data["ignore"] = True
+        if alter:
+            data["alter"] = True
         url = "{}/{}/-/insert".format(url, table)
     response = httpx.post(
         url,
