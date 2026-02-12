@@ -9,7 +9,7 @@ A client CLI utility for [Datasette](https://datasette.io/) instances
 
 ## Installation
 
-Install `dclient` using `pip` (or [pipx](https://pipxproject.github.io/pipx/):
+Install `dclient` using `pip` (or [pipx](https://pipxproject.github.io/pipx/)):
 
 ```bash
 pip install dclient
@@ -21,15 +21,10 @@ If you also have Datasette installed in the same environment it will register it
 ```bash
 datasette install dclient
 ```
-This means you can run any of these commands using `datasette dt` instead, like this:
+This means you can run any of these commands using `datasette dc` instead, like this:
 ```bash
 datasette dc --help
 datasette dc query https://latest.datasette.io/fixtures "select * from facetable limit 1"
-```
-You can install it into Datasette this way using:
-
-```bash
-datasette install dclient
 ```
 
 ## Contents
@@ -38,8 +33,10 @@ datasette install dclient
 ---
 maxdepth: 3
 ---
+exploring
 queries
+inserting
+writing
 aliases
 authentication
-inserting
 ```

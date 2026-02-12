@@ -4,6 +4,8 @@ The `dclient insert` command can be used to insert data from a local file direct
 
 First you'll need to {ref}`authenticate <authentication>` with the instance.
 
+See also {doc}`writing` for related commands: `upsert`, `update`, `delete`, `drop`, and `create-table`.
+
 To insert data from a `data.csv` file into a table called `my_table`, creating that table if it does not exist:
 
 ```bash
@@ -138,3 +140,7 @@ Options:
 
 ```
 <!-- [[[end]]] -->
+
+:::{note}
+To update existing rows rather than inserting new ones, see {doc}`writing` for the `upsert` and `update` commands.
+:::
