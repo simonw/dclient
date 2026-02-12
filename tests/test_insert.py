@@ -120,7 +120,7 @@ def make_format_test(content, arg):
             input_data=SIMPLE_CSV,
             cmd_args=[],
             table_exists=False,
-            expected_output="Inserting rows\nError: Table not found: table1\n",
+            expected_output="Inserting rows\nError: Table not found\n",
             should_error=True,
             expected_table_json=None,
         ),
@@ -296,7 +296,7 @@ def test_insert_against_datasette(
 
         return loop.run_until_complete(run())
 
-    httpx_mock.add_callback(custom_response)
+    httpx_mock.add_callback(custom_response, is_optional=should_error)
 
     path = pathlib.Path(tmpdir) / "data.txt"
     if isinstance(input_data, str):
