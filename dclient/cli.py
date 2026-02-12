@@ -70,7 +70,7 @@ def _api_get(url, token=None, params=None, verbose=False):
         if params:
             full_url += "?" + urllib.parse.urlencode(params, doseq=True)
         click.echo(full_url, err=True)
-    response = httpx.get(url, params=params, headers=headers, timeout=40.0)
+    response = httpx.get(url, params=params, headers=headers, timeout=40.0, follow_redirects=True)
     if response.status_code != 200:
         _raise_api_error(response)
     try:
