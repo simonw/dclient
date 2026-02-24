@@ -4,19 +4,23 @@ The `dclient insert` command can be used to insert data from a local file direct
 
 First you'll need to {ref}`authenticate <authentication>` with the instance.
 
-To insert data from a `data.csv` file into a table called `my_table`, creating that table if it does not exist:
+To insert data from a `data.csv` file into a table called `my_table` in the `data` database:
 
 ```bash
-dclient insert \
-  https://my-private-space.datasette.cloud/data \
-  my_table data.csv --create
+dclient insert data my_table data.csv --create -i myapp
 ```
 You can also pipe data into standard input:
 ```bash
 curl -s 'https://api.github.com/repos/simonw/dclient/issues' | \
-  dclient insert \
-    https://my-private-space.datasette.cloud/data \
-    issues - --create
+  dclient insert data issues - --create -i myapp
+```
+
+## Upserting data
+
+The `dclient upsert` command works exactly like `insert` but uses the upsert endpoint, which will update existing rows with matching primary keys rather than raising an error.
+
+```bash
+dclient upsert data my_table data.csv --csv -i myapp
 ```
 
 ## Streaming data
@@ -26,7 +30,7 @@ curl -s 'https://api.github.com/repos/simonw/dclient/issues' | \
 If you have a log file containing newline-delimited JSON you can tail it and send it to a Datasette instance like this:
 ```bash
 tail -f log.jsonl | \
-  dclient insert https://my-private-space.datasette.cloud/data logs - --nl
+  dclient insert data logs - --nl -i myapp
 ```
 When reading from standard input (filename `-`) you are required to specify the format. In this example that's `--nl` for newline-delimited JSON. `--csv` and `--tsv` are supported for streaming as well, but `--json` is not.
 
@@ -34,7 +38,7 @@ In streaming mode records default to being sent to the server every 100 records 
 
 ```bash
 tail -f log.jsonl | dclient insert \
-  https://my-private-space.datasette.cloud/data logs - --nl --create \
+  data logs - --nl --create -i myapp \
   --batch-size 10 \
   --interval 5
 ```
@@ -106,26 +110,65 @@ cog.out(
 )
 ]]] -->
 ```
-Usage: dclient insert [OPTIONS] URL_OR_ALIAS TABLE FILEPATH
+Usage: dclient insert [OPTIONS] DATABASE TABLE FILEPATH
 
   Insert data into a remote Datasette instance
 
   Example usage:
 
-      dclient insert \
-        https://private.datasette.cloud/data \
-        mytable data.csv --pk id --create
+      dclient insert main mytable data.csv --csv -i myapp
+      dclient insert main mytable data.csv --csv --create --pk id
 
 Options:
+  -i, --instance TEXT   Datasette instance URL or alias
   --csv                 Input is CSV
   --tsv                 Input is TSV
   --json                Input is JSON
   --nl                  Input is newline-delimited JSON
   --encoding TEXT       Character encoding for CSV/TSV
   --no-detect-types     Don't detect column types for CSV/TSV
+  --alter               Alter table to add any missing columns
+  --pk TEXT             Columns to use as the primary key when creating the
+                        table
+  --batch-size INTEGER  Send rows in batches of this size
+  --interval FLOAT      Send batch at least every X seconds
+  -t, --token TEXT      API token
+  --silent              Don't output progress
+  -v, --verbose         Verbose output: show HTTP request and response
   --replace             Replace rows with a matching primary key
   --ignore              Ignore rows with a matching primary key
   --create              Create table if it does not exist
+  --help                Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+## dclient upsert --help
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["upsert", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient upsert [OPTIONS] DATABASE TABLE FILEPATH
+
+  Upsert data into a remote Datasette instance
+
+  Example usage:
+
+      dclient upsert main mytable data.csv --csv -i myapp
+
+Options:
+  -i, --instance TEXT   Datasette instance URL or alias
+  --csv                 Input is CSV
+  --tsv                 Input is TSV
+  --json                Input is JSON
+  --nl                  Input is newline-delimited JSON
+  --encoding TEXT       Character encoding for CSV/TSV
+  --no-detect-types     Don't detect column types for CSV/TSV
   --alter               Alter table to add any missing columns
   --pk TEXT             Columns to use as the primary key when creating the
                         table
