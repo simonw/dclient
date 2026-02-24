@@ -1,5 +1,6 @@
 import asyncio
 from collections import namedtuple
+from concurrent.futures import ThreadPoolExecutor
 from click.testing import CliRunner
 from datasette.app import Datasette
 from dclient.cli import cli
@@ -12,6 +13,9 @@ import pytest
 @pytest.fixture
 def assert_all_responses_were_requested() -> bool:
     return False
+
+
+pytestmark = pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
 
 
 @pytest.fixture
@@ -120,7 +124,7 @@ def make_format_test(content, arg):
             input_data=SIMPLE_CSV,
             cmd_args=[],
             table_exists=False,
-            expected_output="Inserting rows\nError: Table not found: table1\n",
+            expected_output="Inserting rows\nError: Table not found\n",
             should_error=True,
             expected_table_json=None,
         ),
@@ -229,7 +233,8 @@ def make_format_test(content, arg):
         ),
     ),
 )
-def test_insert_against_datasette(
+@pytest.mark.asyncio
+async def test_insert_against_datasette(
     httpx_mock,
     tmpdir,
     input_data,
@@ -250,23 +255,19 @@ def test_insert_against_datasette(
         }
     )
     db = ds.add_memory_database("data")
-    loop = asyncio.get_event_loop()
 
     # Drop all tables in the database each time, because in-memory
     # databases persist in between test runs
-    drop_all_tables(db, loop)
+    for table in await db.table_names():
+        await db.execute_write("drop table {}".format(table))
 
     if table_exists:
-
-        async def run_table_exists():
-            await db.execute_write(
-                "create table table1 (a integer primary key, b integer, c integer)"
-            )
-            await db.execute_write(
-                "insert into table1 (a, b, c) values (1, 2, 3), (4, 5, 6)"
-            )
-
-        loop.run_until_complete(run_table_exists())
+        await db.execute_write(
+            "create table table1 (a integer primary key, b integer, c integer)"
+        )
+        await db.execute_write(
+            "insert into table1 (a, b, c) values (1, 2, 3), (4, 5, 6)"
+        )
 
     token = ds.create_token("actor")
 
@@ -275,8 +276,9 @@ def test_insert_against_datasette(
     datasette_responses = []
 
     def custom_response(request: httpx.Request):
-        # Need to run this in async loop, because dclient itself uses
-        # sync HTTPX and not async HTTPX
+        # Need to run this in a new event loop, because dclient itself uses
+        # sync HTTPX and not async HTTPX, and the test's event loop is
+        # already running
         async def run():
             datasette_requests.append(request)
             response = await ds.client.request(
@@ -294,7 +296,8 @@ def test_insert_against_datasette(
             datasette_responses.append(response)
             return response
 
-        return loop.run_until_complete(run())
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, run()).result()
 
     httpx_mock.add_callback(custom_response)
 
@@ -323,18 +326,5 @@ def test_insert_against_datasette(
     assert result.output == expected_output
 
     if expected_table_json:
-
-        async def fetch_table():
-            response = await ds.client.get("/data/table1.json?_shape=array")
-            return response
-
-        response = loop.run_until_complete(fetch_table())
+        response = await ds.client.get("/data/table1.json?_shape=array")
         assert response.json() == expected_table_json
-
-
-def drop_all_tables(db, loop):
-    async def run():
-        for table in await db.table_names():
-            await db.execute_write("drop table {}".format(table))
-
-    loop.run_until_complete(run())
