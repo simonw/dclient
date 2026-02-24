@@ -22,6 +22,41 @@ def cli():
 
 
 @cli.command()
+@click.argument("path")
+@click.option("--instance", default=None, help="Datasette URL or alias")
+@click.option("--token", help="API token")
+def get(path, instance, token):
+    """
+    Make an authenticated GET request to a Datasette instance
+
+    Example usage:
+
+    \b
+        dclient get /-/plugins.json
+        dclient get /data/creatures.json --instance https://my.datasette.io
+    """
+    url = _resolve_url(instance)
+    token = _resolve_token(token, url)
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    full_url = url.rstrip("/") + "/" + path.lstrip("/")
+    response = httpx.get(
+        full_url,
+        headers=headers,
+        follow_redirects=True,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        raise click.ClickException(f"{response.status_code} error for {full_url}")
+    # Pretty-print if JSON, otherwise raw
+    if "json" in response.headers.get("content-type", ""):
+        click.echo(json.dumps(response.json(), indent=2))
+    else:
+        click.echo(response.text)
+
+
+@cli.command()
 @click.argument("url_or_alias")
 @click.argument("sql")
 @click.option("--token", help="API token")
