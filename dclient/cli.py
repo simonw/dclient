@@ -49,7 +49,7 @@ def query(url_or_alias, sql, token, verbose):
     params = {"sql": sql, "_shape": "objects"}
     if verbose:
         click.echo(url + "?" + urllib.parse.urlencode(params), err=True)
-    response = httpx.get(url, params=params, headers=headers)
+    response = httpx.get(url, params=params, headers=headers, follow_redirects=True)
 
     if response.status_code != 200:
         # Is it valid JSON?
