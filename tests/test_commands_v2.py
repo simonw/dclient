@@ -536,3 +536,57 @@ def test_get_command(httpx_mock, mocker, tmpdir):
     assert data == {"hello": "world"}
     request = httpx_mock.get_request()
     assert request.url.path == "/-/plugins.json"
+
+
+# -- instances command --
+
+
+def test_instances_plain(mocker, tmpdir):
+    config_dir = pathlib.Path(tmpdir)
+    mocker.patch("dclient.cli.get_config_dir", return_value=config_dir)
+    (config_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "default_instance": "prod",
+                "instances": {
+                    "prod": {"url": "https://prod.example.com", "default_database": "main"},
+                    "staging": {"url": "https://staging.example.com", "default_database": None},
+                },
+            }
+        )
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["instances"])
+    assert result.exit_code == 0
+    assert "* prod = https://prod.example.com (db: main)" in result.output
+    assert "  staging = https://staging.example.com" in result.output
+
+
+def test_instances_json(mocker, tmpdir):
+    config_dir = pathlib.Path(tmpdir)
+    mocker.patch("dclient.cli.get_config_dir", return_value=config_dir)
+    (config_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "default_instance": "prod",
+                "instances": {
+                    "prod": {"url": "https://prod.example.com", "default_database": "main"},
+                },
+            }
+        )
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["instances", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert "prod" in data["instances"]
+    assert data["default_instance"] == "prod"
+
+
+def test_instances_empty(mocker, tmpdir):
+    config_dir = pathlib.Path(tmpdir)
+    mocker.patch("dclient.cli.get_config_dir", return_value=config_dir)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["instances"])
+    assert result.exit_code == 0
+    assert result.output.strip() == ""

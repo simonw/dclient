@@ -60,7 +60,10 @@ def _resolve_instance(instance, config_file):
     if env_url:
         return env_url.rstrip("/")
     raise click.ClickException(
-        "No instance specified. Use -i, set a default instance, or set DATASETTE_URL."
+        "No instance specified. Use -i <url-or-alias>, or configure a default:\n\n"
+        "    dclient alias add <name> <url>\n"
+        "    dclient alias default <name>\n\n"
+        "Or set the DATASETTE_URL environment variable."
     )
 
 
@@ -81,7 +84,9 @@ def _resolve_database(database, instance_alias, config_file):
     if env_db:
         return env_db
     raise click.ClickException(
-        "No database specified. Use -d, set a default database, or set DATASETTE_DATABASE."
+        "No database specified. Use -d <name>, or configure a default:\n\n"
+        "    dclient alias default-db <alias> <database>\n\n"
+        "Or set the DATASETTE_DATABASE environment variable."
     )
 
 
@@ -640,6 +645,31 @@ def default_query(sql, instance, database, token, verbose):
         raise click.ClickException(": ".join(bits))
 
     click.echo(json.dumps(response.json()["rows"], indent=2))
+
+
+@cli.command()
+@click.option("--json", "_json", is_flag=True, help="Output raw JSON")
+def instances(_json):
+    """
+    List known instances from the config
+
+    Example usage:
+
+    \b
+        dclient instances
+        dclient instances --json
+    """
+    config_file = get_config_dir() / "config.json"
+    config = _load_config(config_file)
+    inst_map = config.get("instances", {})
+    default = config.get("default_instance")
+    if _json:
+        click.echo(json.dumps(config, indent=2))
+    else:
+        for name, inst in inst_map.items():
+            marker = "* " if name == default else "  "
+            db_info = f" (db: {inst['default_database']})" if inst.get("default_database") else ""
+            click.echo(f"{marker}{name} = {inst['url']}{db_info}")
 
 
 # -- alias command group --
