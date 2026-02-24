@@ -439,6 +439,13 @@ def _load_auths(auth_file):
 
 
 def _resolve_url(url_or_alias):
+    if not url_or_alias:
+        base_url = os.environ.get("DATASETTE_URL")
+        if base_url:
+            return base_url.rstrip("/")
+        raise click.ClickException(
+            "No URL provided. Set DATASETTE_URL or pass a URL/alias."
+        )
     aliases = _load_aliases(get_config_dir() / "aliases.json")
     if url_or_alias in aliases:
         return aliases[url_or_alias]
