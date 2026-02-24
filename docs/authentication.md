@@ -161,7 +161,7 @@ cog.out(
 )
 ]]] -->
 ```
-Usage: dclient actor [OPTIONS] URL_OR_ALIAS
+Usage: dclient actor [OPTIONS] [URL_OR_ALIAS]
 
   Show the actor represented by an API token
 
