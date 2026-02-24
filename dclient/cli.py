@@ -252,7 +252,7 @@ def insert(
 
 
 @cli.command()
-@click.argument("url_or_alias")
+@click.argument("url_or_alias", default=None, required=False)
 @click.option("--token", help="API token")
 def actor(url_or_alias, token):
     """
@@ -270,9 +270,7 @@ def actor(url_or_alias, token):
 
     token = _resolve_token(token, url)
 
-    url_bits = url.split("/")
-    url_bits[-1] = "-/actor.json"
-    actor_url = "/".join(url_bits)
+    actor_url = url.rstrip("/") + "/-/actor.json"
     response = httpx.get(
         actor_url, headers={"Authorization": "Bearer {}".format(token)}, timeout=40.0
     )
