@@ -57,6 +57,34 @@ def get(path, instance, token):
 
 
 @cli.command()
+@click.argument("url_or_alias", default=None, required=False)
+@click.option("--token", help="API token")
+def databases(url_or_alias, token):
+    """
+    List databases available on a Datasette instance
+
+    Example usage:
+
+    \b
+        dclient databases https://latest.datasette.io
+    """
+    url = _resolve_url(url_or_alias)
+    token = _resolve_token(token, url)
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    response = httpx.get(
+        url.rstrip("/") + "/-/databases.json",
+        headers=headers,
+        follow_redirects=True,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        raise click.ClickException(f"{response.status_code} error")
+    click.echo(json.dumps(response.json(), indent=2))
+
+
+@cli.command()
 @click.argument("url_or_alias")
 @click.argument("sql")
 @click.option("--token", help="API token")
