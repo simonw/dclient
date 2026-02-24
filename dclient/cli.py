@@ -1,6 +1,7 @@
 import click
 import httpx
 import json
+import os
 import pathlib
 from sqlite_utils.utils import rows_from_file, Format, TypeTracker, progressbar
 import sys
@@ -38,17 +39,10 @@ def query(url_or_alias, sql, token, verbose):
           https://datasette.io/content \\
           'select * from news limit 10'
     """
-    aliases_file = get_config_dir() / "aliases.json"
-    aliases = _load_aliases(aliases_file)
-    if url_or_alias in aliases:
-        url = aliases[url_or_alias]
-    else:
-        url = url_or_alias
-    if not url_or_alias.endswith(".json"):
+    url = _resolve_url(url_or_alias)
+    token = _resolve_token(token, url)
+    if not url.endswith(".json"):
         url += ".json"
-    if token is None:
-        # Maybe there's a token in auth.json?
-        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
     headers = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -167,15 +161,8 @@ def insert(
           https://private.datasette.cloud/data \\
           mytable data.csv --pk id --create
     """
-    aliases_file = get_config_dir() / "aliases.json"
-    aliases = _load_aliases(aliases_file)
-    if url_or_alias in aliases:
-        url = aliases[url_or_alias]
-    else:
-        url = url_or_alias
-
-    if token is None:
-        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+    url = _resolve_url(url_or_alias)
+    token = _resolve_token(token, url)
 
     format = None
     if format_csv:
@@ -276,18 +263,12 @@ def actor(url_or_alias, token):
     \b
         dclient actor https://latest.datasette.io/fixtures
     """
-    aliases_file = get_config_dir() / "aliases.json"
-    aliases = _load_aliases(aliases_file)
-    if url_or_alias in aliases:
-        url = aliases[url_or_alias]
-    else:
-        url = url_or_alias
+    url = _resolve_url(url_or_alias)
 
     if not (url.startswith("http://") or url.startswith("https://")):
         raise click.ClickException("Invalid URL: " + url)
 
-    if token is None:
-        token = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+    token = _resolve_token(token, url)
 
     url_bits = url.split("/")
     url_bits[-1] = "-/actor.json"
@@ -455,6 +436,27 @@ def _load_auths(auth_file):
     else:
         auths = {}
     return auths
+
+
+def _resolve_url(url_or_alias):
+    aliases = _load_aliases(get_config_dir() / "aliases.json")
+    if url_or_alias in aliases:
+        return aliases[url_or_alias]
+    if url_or_alias.startswith("http://") or url_or_alias.startswith("https://"):
+        return url_or_alias
+    base_url = os.environ.get("DATASETTE_URL")
+    if base_url:
+        return base_url.rstrip("/") + "/" + url_or_alias
+    return url_or_alias
+
+
+def _resolve_token(token, url):
+    if token is not None:
+        return token
+    stored = token_for_url(url, _load_auths(get_config_dir() / "auth.json"))
+    if stored is not None:
+        return stored
+    return os.environ.get("DATASETTE_TOKEN")
 
 
 def _batches(iterable, size, interval=None):
