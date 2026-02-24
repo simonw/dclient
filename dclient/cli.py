@@ -422,6 +422,114 @@ def auth_remove(alias_or_url):
         raise click.ClickException("No such URL or alias")
 
 
+@auth.command(name="login")
+@click.argument("url_or_alias")
+@click.option("--scope", "scope_json", default=None, help="JSON array of scope arrays")
+@click.option("--open/--no-open", "open_browser", default=True, help="Open browser automatically")
+def auth_login(url_or_alias, scope_json, open_browser):
+    """
+    Log in to a Datasette instance using the device authorization flow
+
+    Example usage:
+
+    \b
+        dclient auth login https://my-datasette.example.com/data
+
+    This will display a code and URL. Visit the URL in your browser,
+    sign in to Datasette, and enter the code to authorize this device.
+    """
+    import webbrowser
+
+    url = _resolve_url(url_or_alias)
+
+    # Find the base Datasette URL (strip database/table path)
+    # We need the root URL for the OAuth endpoints
+    base_url = url.rstrip("/")
+
+    # POST to the device endpoint
+    data = {}
+    if scope_json:
+        data["scope"] = scope_json
+
+    try:
+        response = httpx.post(
+            f"{base_url}/-/oauth/device",
+            data=data,
+            timeout=30.0,
+        )
+    except httpx.ConnectError:
+        raise click.ClickException(f"Could not connect to {base_url}")
+
+    if response.status_code != 200:
+        try:
+            error = response.json().get("error", response.text)
+        except Exception:
+            error = response.text
+        raise click.ClickException(f"Device authorization failed: {error}")
+
+    device_data = response.json()
+    device_code = device_data["device_code"]
+    user_code = device_data["user_code"]
+    verification_uri = device_data["verification_uri"]
+    interval = device_data.get("interval", 5)
+    expires_in = device_data.get("expires_in", 900)
+
+    click.echo(f"Enter this code in your browser: {user_code}")
+    click.echo()
+    click.echo(f"  {verification_uri}?code={user_code}")
+    click.echo()
+
+    if open_browser:
+        webbrowser.open(f"{verification_uri}?code={user_code}")
+        click.echo("Browser opened. Waiting for authorization...")
+    else:
+        click.echo("Waiting for authorization...")
+
+    # Poll for the token
+    deadline = time.time() + expires_in
+    while time.time() < deadline:
+        time.sleep(interval)
+
+        token_response = httpx.post(
+            f"{base_url}/-/oauth/token",
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "device_code": device_code,
+            },
+            timeout=30.0,
+        )
+
+        token_data = token_response.json()
+
+        if token_response.status_code == 200 and "access_token" in token_data:
+            # Store the token
+            access_token = token_data["access_token"]
+            config_dir = get_config_dir()
+            config_dir.mkdir(parents=True, exist_ok=True)
+            auth_file = config_dir / "auth.json"
+            auths = _load_auths(auth_file)
+            auths[url] = access_token
+            auth_file.write_text(json.dumps(auths, indent=4))
+
+            click.echo(f"Authenticated! Token saved for {url}")
+            return
+
+        error = token_data.get("error", "")
+        if error == "authorization_pending":
+            continue
+        elif error == "slow_down":
+            interval += 5
+            continue
+        elif error == "access_denied":
+            raise click.ClickException("Authorization was denied")
+        elif error == "expired_token":
+            raise click.ClickException("Device code expired. Please try again.")
+        else:
+            raise click.ClickException(f"Token exchange failed: {error}")
+
+    raise click.ClickException("Timed out waiting for authorization")
+
+
 def _load_aliases(aliases_file):
     if aliases_file.exists():
         aliases = json.loads(aliases_file.read_text())
