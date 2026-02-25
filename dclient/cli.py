@@ -184,6 +184,118 @@ def query(url_or_alias, sql, token, verbose):
 @cli.command()
 @click.argument("url_or_alias")
 @click.argument("table")
+@click.option(
+    "-f",
+    "--filter",
+    "filters",
+    nargs=3,
+    multiple=True,
+    help="Filter: column operator value. Example: -f age gte 5",
+)
+@click.option(
+    "--where",
+    "where_clauses",
+    multiple=True,
+    help="SQL where clause. Can be specified multiple times.",
+)
+@click.option("--sort", "sort_column", default=None, help="Sort by column (ascending)")
+@click.option(
+    "--sort-desc",
+    "sort_desc_column",
+    default=None,
+    help="Sort by column (descending)",
+)
+@click.option("--token", help="API token")
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request")
+def rows(url_or_alias, table, filters, where_clauses, sort_column, sort_desc_column, token, verbose):
+    """
+    Fetch rows from a Datasette table
+
+    Returns a JSON array of row objects
+
+    Example usage:
+
+    \b
+        dclient rows content creatures
+        dclient rows content creatures -f age gte 5
+        dclient rows content creatures -f species in dog,cat --sort name
+        dclient rows content creatures --where "id > 5" --sort-desc age
+    """
+    if sort_column and sort_desc_column:
+        raise click.ClickException("Cannot use both --sort and --sort-desc")
+
+    url = _resolve_url(url_or_alias)
+    token = _resolve_token(token, url)
+
+    table_url = url.rstrip("/") + "/" + table + ".json"
+
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    # Build params as list of tuples to support repeated keys (_where)
+    params = [("_shape", "objects")]
+
+    for col, op, val in filters:
+        if op == "eq":
+            op = "exact"
+        params.append((f"{col}__{op}", val))
+
+    for clause in where_clauses:
+        params.append(("_where", clause))
+
+    if sort_column:
+        params.append(("_sort", sort_column))
+
+    if sort_desc_column:
+        params.append(("_sort_desc", sort_desc_column))
+
+    if verbose:
+        click.echo(table_url + "?" + urllib.parse.urlencode(params), err=True)
+
+    response = httpx.get(
+        table_url, params=params, headers=headers, follow_redirects=True, timeout=30.0
+    )
+
+    if response.status_code != 200:
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            raise click.ClickException(
+                "{} status code. Response was not valid JSON".format(
+                    response.status_code
+                )
+            )
+        bits = []
+        if data.get("title"):
+            bits.append(data["title"])
+        if data.get("error"):
+            bits.append(data["error"])
+        raise click.ClickException(
+            "{} status code. {}".format(response.status_code, ": ".join(bits))
+        )
+
+    try:
+        data = response.json()
+    except json.JSONDecodeError:
+        raise click.ClickException("Response was not valid JSON")
+
+    if not data.get("ok"):
+        bits = []
+        if data.get("title"):
+            bits.append(data["title"])
+        if data.get("error"):
+            bits.append(data["error"])
+        if not bits:
+            bits = [json.dumps(data)]
+        raise click.ClickException(": ".join(bits))
+
+    click.echo(json.dumps(data["rows"], indent=2))
+
+
+@cli.command()
+@click.argument("url_or_alias")
+@click.argument("table")
 @click.argument(
     "filepath", type=click.Path("rb", readable=True, allow_dash=True, dir_okay=False)
 )
