@@ -64,6 +64,7 @@ def test_login_with_url(httpx_mock, mocker, tmpdir):
     mocker.patch("dclient.cli.time.sleep")
     httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
     httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
     runner = CliRunner()
     result = runner.invoke(cli, ["login", "https://example.com/"])
     assert result.exit_code == 0
@@ -80,6 +81,7 @@ def test_login_adds_trailing_slash(httpx_mock, mocker, tmpdir):
     mocker.patch("dclient.cli.time.sleep")
     httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
     httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
     runner = CliRunner()
     result = runner.invoke(cli, ["login", "https://example.com"])
     assert result.exit_code == 0
@@ -108,6 +110,7 @@ def test_login_with_alias(httpx_mock, mocker, tmpdir):
     )
     httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
     httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
     runner = CliRunner()
     result = runner.invoke(cli, ["login", "prod"])
     assert result.exit_code == 0
@@ -123,6 +126,7 @@ def test_login_interactive_prompt(httpx_mock, mocker, tmpdir):
     mocker.patch("dclient.cli.time.sleep")
     httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
     httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
     runner = CliRunner()
     result = runner.invoke(cli, ["login"], input="https://example.com/\n")
     assert result.exit_code == 0
@@ -160,6 +164,7 @@ def test_login_pending_then_success(httpx_mock, mocker, tmpdir):
     httpx_mock.add_response(json={"error": "authorization_pending"}, status_code=400)
     # Second poll: success
     httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
     runner = CliRunner()
     result = runner.invoke(cli, ["login", "https://example.com/"])
     assert result.exit_code == 0
@@ -176,3 +181,123 @@ def test_login_device_endpoint_error(httpx_mock, mocker, tmpdir):
     result = runner.invoke(cli, ["login", "https://example.com/"])
     assert result.exit_code == 1
     assert "Failed to start login flow" in result.output
+
+
+# -- login sets defaults --
+
+
+@pytest.mark.parametrize(
+    "databases_response,expected_db",
+    [
+        ([{"name": "mydata", "is_mutable": True}], "mydata"),
+        (
+            [
+                {"name": "fixtures", "is_mutable": False},
+                {"name": "data", "is_mutable": True},
+                {"name": "extra", "is_mutable": True},
+            ],
+            "data",
+        ),
+        (
+            [
+                {"name": "alpha", "is_mutable": True},
+                {"name": "beta", "is_mutable": True},
+                {"name": "gamma", "is_mutable": False},
+            ],
+            "alpha",
+        ),
+    ],
+    ids=["single_db", "prefers_data", "first_when_no_data"],
+)
+def test_login_sets_defaults(
+    httpx_mock, mocker, tmpdir, databases_response, expected_db
+):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=databases_response, status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/"])
+    assert result.exit_code == 0, result.output
+    config = json.loads((pathlib.Path(tmpdir) / "config.json").read_text())
+    assert config["default_instance"] == "https://example.com/"
+    assert (
+        config["instances"]["https://example.com/"]["default_database"] == expected_db
+    )
+
+
+def test_login_does_not_override_existing_defaults(httpx_mock, mocker, tmpdir):
+    """When defaults are already configured, login should not change them."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    config_file = pathlib.Path(tmpdir) / "config.json"
+    config_file.write_text(
+        json.dumps(
+            {
+                "default_instance": "prod",
+                "instances": {
+                    "prod": {
+                        "url": "https://prod.example.com",
+                        "default_database": "main",
+                    }
+                },
+            }
+        )
+    )
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://other.example.com/"])
+    assert result.exit_code == 0, result.output
+    config = json.loads(config_file.read_text())
+    assert config["default_instance"] == "prod"
+
+
+def test_login_with_alias_sets_defaults(httpx_mock, mocker, tmpdir):
+    """When logging in with an alias that has no default_database, set it."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    config_file = pathlib.Path(tmpdir) / "config.json"
+    config_file.write_text(
+        json.dumps(
+            {
+                "default_instance": None,
+                "instances": {
+                    "prod": {
+                        "url": "https://prod.example.com",
+                        "default_database": None,
+                    }
+                },
+            }
+        )
+    )
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(
+        json=[
+            {"name": "fixtures", "is_mutable": False},
+            {"name": "data", "is_mutable": True},
+            {"name": "extra", "is_mutable": True},
+        ],
+        status_code=200,
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "prod"])
+    assert result.exit_code == 0, result.output
+    config = json.loads(config_file.read_text())
+    assert config["default_instance"] == "prod"
+    assert config["instances"]["prod"]["default_database"] == "data"
+
+
+def test_login_databases_error_still_succeeds(httpx_mock, mocker, tmpdir):
+    """If the databases check fails, login should still succeed."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(status_code=500)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/"])
+    assert result.exit_code == 0, result.output
+    assert "Login successful" in result.output

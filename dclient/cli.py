@@ -1163,6 +1163,55 @@ def login(alias_or_url, scope):
     auth_file.write_text(json.dumps(auths, indent=4))
     click.echo(f"Login successful. Token saved for {auth_key}")
 
+    # Step 5: Set defaults if not already configured
+    config = _load_config(config_file)
+    default_alias = config.get("default_instance")
+    has_default_instance = default_alias is not None
+    has_default_db = bool(
+        config.get("instances", {}).get(default_alias or "", {}).get("default_database")
+    )
+    if has_default_instance and has_default_db:
+        return
+    # Find alias for this instance, or use the auth_key (URL) as the instance key
+    instance_key = _instance_alias_for_url(url, config_file) or auth_key
+    # Ensure instance entry exists in config
+    if instance_key not in config.get("instances", {}):
+        config.setdefault("instances", {})[instance_key] = {
+            "url": url.rstrip("/"),
+            "default_database": None,
+        }
+    # Set as default instance if none configured
+    if not has_default_instance:
+        config["default_instance"] = instance_key
+        click.echo(f"Set default instance to {instance_key}")
+    # Query databases and set default database if none configured
+    if not has_default_db:
+        try:
+            db_response = _make_request(url, access_token, "/.json")
+            if db_response.status_code == 200:
+                db_data = db_response.json()
+                if isinstance(db_data, list):
+                    databases_list = db_data
+                else:
+                    databases_list = db_data.get("databases", [])
+                if isinstance(databases_list, dict):
+                    databases_list = list(databases_list.values())
+                db_names = [
+                    db["name"] if isinstance(db, dict) else db for db in databases_list
+                ]
+                if db_names:
+                    if len(db_names) == 1:
+                        default_db = db_names[0]
+                    elif "data" in db_names:
+                        default_db = "data"
+                    else:
+                        default_db = db_names[0]
+                    config["instances"][instance_key]["default_database"] = default_db
+                    click.echo(f"Set default database to {default_db}")
+        except Exception:
+            pass  # Don't fail login if databases check fails
+    _save_config(config_file, config)
+
 
 # -- v1 → v2 migration --
 
