@@ -32,7 +32,7 @@ dev = [
     "pytest-httpx",
     "cogapp",
     "pytest-mock",
-    "datasette>=1.0a2",
+    "datasette>=1.0a25",
 ]
 
 [tool.uv.build-backend]

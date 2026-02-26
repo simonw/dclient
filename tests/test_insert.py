@@ -271,7 +271,7 @@ async def test_insert_against_datasette(
             "insert into table1 (a, b, c) values (1, 2, 3), (4, 5, 6)"
         )
 
-    token = ds.create_token("actor")
+    token = await ds.create_token("actor")
 
     # These are useful with pytest --pdb to see what happened
     datasette_requests = []
