@@ -4,35 +4,57 @@
 
 `dclient` can handle API tokens for Datasette instances that require authentication.
 
-You can pass an API token to `query` using `-t/--token` like this:
+You can pass an API token to any command using `--token` like this:
 
 ```bash
-dclient query https://latest.datasette.io/fixtures "select * from facetable" -t dstok_mytoken
+dclient query fixtures "select * from facetable" --token dstok_mytoken -i latest
 ```
 
-A more convenient way to handle this is to store tokens to be used with different URL prefixes.
+A more convenient way to handle this is to store tokens for your aliases.
 
 ## Using stored tokens
 
-To always use `dstok_mytoken` for any URL on the `https://latest.datasette.io/` instance you can run this:
+To store a token for an alias:
 ```bash
-dclient auth add https://latest.datasette.io/
+dclient auth add latest
 ```
 Then paste in the token and hit enter when prompted to do so.
 
-To list which URLs you have set tokens for, run the `auth list` command:
+Tokens can also be stored for direct URLs:
+```bash
+dclient auth add https://latest.datasette.io
+```
+
+To list which aliases/URLs you have set tokens for, run the `auth list` command:
 ```bash
 dclient auth list
 ```
-To delete the token for a specific URL, run `auth remove`:
+To delete the token for a specific alias or URL, run `auth remove`:
 ```bash
-dclient auth remove https://latest.datasette.io/
+dclient auth remove latest
 ```
+
+## Token resolution order
+
+When making a request, dclient resolves the token in this order:
+
+1. `--token` CLI flag (highest priority)
+2. Token stored by alias name in `auth.json`
+3. Token stored by URL prefix in `auth.json`
+4. `DATASETTE_TOKEN` environment variable (lowest priority)
+
 ## Testing a token
 
-The `dclient actor` command can be used to test a token, retrieving the actor that the token represents.
+The `dclient auth status` command can be used to verify authentication by calling `/-/actor.json`:
 ```bash
-dclient actor https://latest.datasette.io/content
+dclient auth status
+dclient auth status -i prod
+```
+
+The `dclient actor` command also shows the actor:
+```bash
+dclient actor
+dclient actor -i prod
 ```
 The output looks like this:
 ```json
@@ -68,6 +90,7 @@ Commands:
   add     Add an authentication token for an alias or URL
   list    List stored API tokens
   remove  Remove the API token for an alias or URL
+  status  Verify authentication by calling /-/actor.json
 
 ```
 <!-- [[[end]]] -->
@@ -89,7 +112,8 @@ Usage: dclient auth add [OPTIONS] ALIAS_OR_URL
 
   Example usage:
 
-      dclient auth add https://datasette.io/content
+      dclient auth add prod
+      dclient auth add https://datasette.io
 
   Paste in the token when prompted.
 
@@ -142,10 +166,38 @@ Usage: dclient auth remove [OPTIONS] ALIAS_OR_URL
 
   Example usage:
 
-      dclient auth remove https://datasette.io/content
+      dclient auth remove prod
 
 Options:
   --help  Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+## dclient auth status --help
+
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["auth", "status", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient auth status [OPTIONS]
+
+  Verify authentication by calling /-/actor.json
+
+  Example usage:
+
+      dclient auth status
+      dclient auth status -i prod
+
+Options:
+  -i, --instance TEXT  Datasette instance URL or alias
+  --token TEXT         API token
+  --help               Show this message and exit.
 
 ```
 <!-- [[[end]]] -->
@@ -161,17 +213,19 @@ cog.out(
 )
 ]]] -->
 ```
-Usage: dclient actor [OPTIONS] [URL_OR_ALIAS]
+Usage: dclient actor [OPTIONS]
 
   Show the actor represented by an API token
 
   Example usage:
 
-      dclient actor https://latest.datasette.io/fixtures
+      dclient actor
+      dclient actor -i prod
 
 Options:
-  --token TEXT  API token
-  --help        Show this message and exit.
+  -i, --instance TEXT  Datasette instance URL or alias
+  --token TEXT         API token
+  --help               Show this message and exit.
 
 ```
 <!-- [[[end]]] -->

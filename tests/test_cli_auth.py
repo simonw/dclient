@@ -13,26 +13,26 @@ def test_auth(mocker, tmpdir):
     # Should only have one line
     assert len([line for line in result.output.split("\n") if line.strip()]) == 1
 
-    # Now add a token
-    result2 = runner.invoke(cli, ["auth", "add", "https://example.com"], input="xyz\n")
+    # Now add a token (keys are now alias names or URLs)
+    result2 = runner.invoke(cli, ["auth", "add", "prod"], input="xyz\n")
     assert result2.exit_code == 0
 
     # Check the tokens file
     auth_file = pathlib.Path(tmpdir) / "auth.json"
-    assert json.loads(auth_file.read_text()) == {"https://example.com": "xyz"}
+    assert json.loads(auth_file.read_text()) == {"prod": "xyz"}
 
     # auth list should show that now
     result3 = runner.invoke(cli, ["auth", "list"])
     assert result3.output.startswith("Tokens file:")
-    assert "https://example.com" in result3.output
+    assert "prod" in result3.output
 
-    # Remove should fail with an incorrect URL
-    result4 = runner.invoke(cli, ["auth", "remove", "https://example.com/foo"])
+    # Remove should fail with an incorrect key
+    result4 = runner.invoke(cli, ["auth", "remove", "nonexistent"])
     assert result4.exit_code == 1
     assert result4.output == "Error: No such URL or alias\n"
 
-    # Remove should work with the correct URL
-    result5 = runner.invoke(cli, ["auth", "remove", "https://example.com"])
+    # Remove should work with the correct key
+    result5 = runner.invoke(cli, ["auth", "remove", "prod"])
     assert result5.exit_code == 0
     assert result5.output == ""
 

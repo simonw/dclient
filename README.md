@@ -11,10 +11,11 @@ Much of the functionality requires Datasette 1.0a2 or higher.
 
 ## Things you can do with dclient
 
-- Run SQL queries against Datasette and returning the results as JSON
+- Run SQL queries against Datasette and return the results as JSON
+- Introspect databases, tables, plugins, and schema
 - Run queries against authenticated Datasette instances
-- Create aliases and store authentication tokens for convenient access to Datasette
-- Insert data into Datasette using the [insert API](https://docs.datasette.io/en/latest/json_api.html#the-json-write-api) (Datasette 1.0 alpha or higher)
+- Create aliases and set default instances/databases for convenient access
+- Insert and upsert data using the [write API](https://docs.datasette.io/en/latest/json_api.html#the-json-write-api) (Datasette 1.0 alpha or higher)
 
 ## Installation
 
@@ -26,19 +27,32 @@ If you want to install it in the same virtual environment as Datasette (to use i
 ```bash
 datasette install dclient
 ```
-## Running a query
+## Quick start
+
+Add an alias for a Datasette instance:
+```bash
+dclient alias add latest https://latest.datasette.io
+dclient alias default latest
+dclient alias default-db latest fixtures
+```
+Now run queries directly:
+```bash
+dclient "select * from facetable limit 1"
+```
+Or be explicit:
+```bash
+dclient query fixtures "select * from facetable limit 1" -i latest
+```
+
+## Introspection
 
 ```bash
-dclient query https://latest.datasette.io/fixtures "select * from facetable limit 1"
+dclient databases
+dclient tables
+dclient plugins
+dclient schema facetable
 ```
-To shorten that, create an alias:
-```bash
-dclient alias add fixtures https://latest.datasette.io/fixtures
-```
-Then run it like this instead:
-```bash
-dclient query fixtures "select * from facetable limit 1"
-```
+
 ## Documentation
 
 Visit **[dclient.datasette.io](https://dclient.datasette.io)** for full documentation on using this tool.

@@ -44,12 +44,14 @@ def test_insert_mocked(httpx_mock, tmpdir):
         cli,
         [
             "insert",
-            "https://datasette.example.com/data",
+            "data",
             "table1",
             str(path),
             "--csv",
             "--token",
             "x",
+            "-i",
+            "https://datasette.example.com",
         ],
         catch_exceptions=False,
     )
@@ -311,11 +313,13 @@ async def test_insert_against_datasette(
         cli,
         [
             "insert",
-            "http://datasette.example.com/data",
+            "data",
             "table1",
             str(path),
             "--token",
             token,
+            "-i",
+            "http://datasette.example.com",
         ]
         + cmd_args,
     )

@@ -26,7 +26,9 @@ def test_datasette_token_used_as_fallback(httpx_mock, mocker, tmpdir):
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_TOKEN": "env-token-123"})
-    result = runner.invoke(cli, ["query", "https://example.com", "select 1"])
+    result = runner.invoke(
+        cli, ["query", "data", "select 1", "-i", "https://example.com"]
+    )
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.headers["authorization"] == "Bearer env-token-123"
@@ -38,7 +40,12 @@ def test_token_flag_overrides_datasette_token(httpx_mock, mocker, tmpdir):
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_TOKEN": "env-token"})
     result = runner.invoke(
-        cli, ["query", "https://example.com", "select 1", "--token", "flag-token"]
+        cli,
+        [
+            "query", "data", "select 1",
+            "-i", "https://example.com",
+            "--token", "flag-token",
+        ],
     )
     assert result.exit_code == 0
     request = httpx_mock.get_request()
@@ -52,7 +59,9 @@ def test_auth_json_overrides_datasette_token(httpx_mock, mocker, tmpdir):
     auth_file.write_text(json.dumps({"https://example.com": "stored-token"}))
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_TOKEN": "env-token"})
-    result = runner.invoke(cli, ["query", "https://example.com", "select 1"])
+    result = runner.invoke(
+        cli, ["query", "data", "select 1", "-i", "https://example.com"]
+    )
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.headers["authorization"] == "Bearer stored-token"
@@ -61,8 +70,8 @@ def test_auth_json_overrides_datasette_token(httpx_mock, mocker, tmpdir):
 # -- DATASETTE_URL tests --
 
 
-def test_datasette_url_combines_with_database_name(httpx_mock, mocker, tmpdir):
-    """DATASETTE_URL + database name arg → combined URL."""
+def test_datasette_url_used_as_instance(httpx_mock, mocker, tmpdir):
+    """DATASETTE_URL provides the instance when no -i flag."""
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_URL": "https://my-instance.datasette.cloud"})
@@ -84,12 +93,14 @@ def test_datasette_url_with_trailing_slash(httpx_mock, mocker, tmpdir):
     assert request.url.path == "/data.json"
 
 
-def test_full_url_ignores_datasette_url(httpx_mock, mocker, tmpdir):
-    """A full URL argument is used as-is, ignoring DATASETTE_URL."""
+def test_explicit_instance_ignores_datasette_url(httpx_mock, mocker, tmpdir):
+    """An explicit -i flag is used, ignoring DATASETTE_URL."""
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_URL": "https://should-be-ignored.com"})
-    result = runner.invoke(cli, ["query", "https://other.example.com/db", "select 1"])
+    result = runner.invoke(
+        cli, ["query", "db", "select 1", "-i", "https://other.example.com"]
+    )
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.url.host == "other.example.com"
@@ -97,13 +108,25 @@ def test_full_url_ignores_datasette_url(httpx_mock, mocker, tmpdir):
 
 
 def test_alias_takes_priority_over_datasette_url(httpx_mock, mocker, tmpdir):
-    """Alias match takes priority over DATASETTE_URL."""
+    """Alias match via -i takes priority over DATASETTE_URL."""
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
-    aliases_file = pathlib.Path(tmpdir) / "aliases.json"
-    aliases_file.write_text(json.dumps({"myalias": "https://aliased.example.com/db"}))
+    config_file = pathlib.Path(tmpdir) / "config.json"
+    config_file.write_text(
+        json.dumps(
+            {
+                "default_instance": None,
+                "instances": {
+                    "myalias": {
+                        "url": "https://aliased.example.com",
+                        "default_database": None,
+                    }
+                },
+            }
+        )
+    )
     httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
     runner = CliRunner(env={"DATASETTE_URL": "https://should-be-ignored.com"})
-    result = runner.invoke(cli, ["query", "myalias", "select 1"])
+    result = runner.invoke(cli, ["query", "db", "select 1", "-i", "myalias"])
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.url.host == "aliased.example.com"
@@ -150,7 +173,7 @@ def test_datasette_url_with_actor(httpx_mock, mocker, tmpdir):
             "DATASETTE_TOKEN": "env-token",
         }
     )
-    result = runner.invoke(cli, ["actor", "data"])
+    result = runner.invoke(cli, ["actor"])
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.url.host == "my-instance.datasette.cloud"
@@ -176,3 +199,23 @@ def test_datasette_url_and_token_together(httpx_mock, mocker, tmpdir):
     assert request.url.host == "my-instance.datasette.cloud"
     assert request.url.path == "/mydb.json"
     assert request.headers["authorization"] == "Bearer env-token-456"
+
+
+# -- DATASETTE_DATABASE tests --
+
+
+def test_datasette_database_with_default_query(httpx_mock, mocker, tmpdir):
+    """DATASETTE_DATABASE is used by default_query shortcut."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    httpx_mock.add_response(json=QUERY_RESPONSE, status_code=200)
+    runner = CliRunner(
+        env={
+            "DATASETTE_URL": "https://my-instance.datasette.cloud",
+            "DATASETTE_DATABASE": "mydb",
+        }
+    )
+    result = runner.invoke(cli, ["select 1"])
+    assert result.exit_code == 0
+    request = httpx_mock.get_request()
+    assert request.url.host == "my-instance.datasette.cloud"
+    assert request.url.path == "/mydb.json"
