@@ -53,7 +53,9 @@ def test_query(httpx_mock, with_token):
 
     # Check the request
     request = httpx_mock.get_request()
-    assert str(request.url) == "https://example.com/content.json?sql=hello&_shape=objects"
+    assert (
+        str(request.url) == "https://example.com/content.json?sql=hello&_shape=objects"
+    )
     if with_token:
         assert request.headers["authorization"] == "Bearer xyz"
     else:
@@ -67,9 +69,7 @@ def test_aliases(mocker, tmpdir, httpx_mock):
     assert result.exit_code == 0
     assert result.output == ""
 
-    result = runner.invoke(
-        cli, ["alias", "add", "foo", "https://example.com"]
-    )
+    result = runner.invoke(cli, ["alias", "add", "foo", "https://example.com"])
     assert result.exit_code == 0
     assert result.output == ""
 

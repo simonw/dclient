@@ -9,9 +9,7 @@ def test_migration_simple(tmpdir):
     """Migrate a simple aliases.json with a database-in-URL alias."""
     config_dir = pathlib.Path(tmpdir)
     aliases_file = config_dir / "aliases.json"
-    aliases_file.write_text(
-        json.dumps({"content": "https://datasette.io/content"})
-    )
+    aliases_file.write_text(json.dumps({"content": "https://datasette.io/content"}))
 
     _migrate_v1_to_v2(config_dir)
 
@@ -29,9 +27,7 @@ def test_migration_no_path_segment(tmpdir):
     """Migrate an alias that has no database in the URL."""
     config_dir = pathlib.Path(tmpdir)
     aliases_file = config_dir / "aliases.json"
-    aliases_file.write_text(
-        json.dumps({"local": "http://localhost:8001"})
-    )
+    aliases_file.write_text(json.dumps({"local": "http://localhost:8001"}))
 
     _migrate_v1_to_v2(config_dir)
 
@@ -44,13 +40,9 @@ def test_migration_with_auth(tmpdir):
     """Auth keys are migrated from URLs to alias names."""
     config_dir = pathlib.Path(tmpdir)
     aliases_file = config_dir / "aliases.json"
-    aliases_file.write_text(
-        json.dumps({"content": "https://datasette.io/content"})
-    )
+    aliases_file.write_text(json.dumps({"content": "https://datasette.io/content"}))
     auth_file = config_dir / "auth.json"
-    auth_file.write_text(
-        json.dumps({"https://datasette.io/content": "tok123"})
-    )
+    auth_file.write_text(json.dumps({"https://datasette.io/content": "tok123"}))
 
     _migrate_v1_to_v2(config_dir)
 
@@ -68,9 +60,7 @@ def test_migration_auth_url_fallback(tmpdir):
     aliases_file = config_dir / "aliases.json"
     aliases_file.write_text(json.dumps({}))
     auth_file = config_dir / "auth.json"
-    auth_file.write_text(
-        json.dumps({"https://other.example.com": "tok456"})
-    )
+    auth_file.write_text(json.dumps({"https://other.example.com": "tok456"}))
 
     _migrate_v1_to_v2(config_dir)
 
@@ -105,9 +95,7 @@ def test_migration_multi_path_segments(tmpdir):
     """URL with multiple path segments stores URL as-is."""
     config_dir = pathlib.Path(tmpdir)
     aliases_file = config_dir / "aliases.json"
-    aliases_file.write_text(
-        json.dumps({"deep": "https://example.com/a/b/c"})
-    )
+    aliases_file.write_text(json.dumps({"deep": "https://example.com/a/b/c"}))
 
     _migrate_v1_to_v2(config_dir)
 

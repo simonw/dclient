@@ -6,7 +6,6 @@ import json
 import pathlib
 import pytest
 
-
 # -- databases command --
 
 
@@ -22,9 +21,7 @@ def test_databases_json(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["databases", "-i", "https://example.com", "--json"]
-    )
+    result = runner.invoke(cli, ["databases", "-i", "https://example.com", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert len(data) == 2
@@ -175,9 +172,7 @@ def test_tables_hidden(httpx_mock, mocker, tmpdir):
     )
     runner = CliRunner()
     # Without --hidden
-    result = runner.invoke(
-        cli, ["tables", "-i", "https://example.com", "-d", "db"]
-    )
+    result = runner.invoke(cli, ["tables", "-i", "https://example.com", "-d", "db"])
     assert "visible" in result.output
     assert "hidden_t" not in result.output
 
@@ -213,9 +208,7 @@ def test_plugins_json(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["plugins", "-i", "https://example.com", "--json"]
-    )
+    result = runner.invoke(cli, ["plugins", "-i", "https://example.com", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert len(data) == 2
@@ -262,9 +255,7 @@ def test_schema_all_tables(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["schema", "-i", "https://example.com", "-d", "main"]
-    )
+    result = runner.invoke(cli, ["schema", "-i", "https://example.com", "-d", "main"])
     assert result.exit_code == 0
     assert "CREATE TABLE users" in result.output
     assert "CREATE VIEW user_count" in result.output
@@ -372,9 +363,7 @@ def test_default_query_with_database_override(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["select count(*) from events", "-d", "analytics"]
-    )
+    result = runner.invoke(cli, ["select count(*) from events", "-d", "analytics"])
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.url.path == "/analytics.json"
@@ -410,9 +399,7 @@ def test_default_query_with_instance_override(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["select count(*) from users", "-i", "staging"]
-    )
+    result = runner.invoke(cli, ["select count(*) from users", "-i", "staging"])
     assert result.exit_code == 0
     request = httpx_mock.get_request()
     assert request.url.host == "staging.example.com"
@@ -528,9 +515,7 @@ def test_get_command(httpx_mock, mocker, tmpdir):
         status_code=200,
     )
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["get", "/-/plugins.json", "-i", "https://example.com"]
-    )
+    result = runner.invoke(cli, ["get", "/-/plugins.json", "-i", "https://example.com"])
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data == {"hello": "world"}
@@ -549,8 +534,14 @@ def test_instances_plain(mocker, tmpdir):
             {
                 "default_instance": "prod",
                 "instances": {
-                    "prod": {"url": "https://prod.example.com", "default_database": "main"},
-                    "staging": {"url": "https://staging.example.com", "default_database": None},
+                    "prod": {
+                        "url": "https://prod.example.com",
+                        "default_database": "main",
+                    },
+                    "staging": {
+                        "url": "https://staging.example.com",
+                        "default_database": None,
+                    },
                 },
             }
         )
@@ -570,7 +561,10 @@ def test_instances_json(mocker, tmpdir):
             {
                 "default_instance": "prod",
                 "instances": {
-                    "prod": {"url": "https://prod.example.com", "default_database": "main"},
+                    "prod": {
+                        "url": "https://prod.example.com",
+                        "default_database": "main",
+                    },
                 },
             }
         )

@@ -3,7 +3,6 @@ from dclient.cli import cli
 import json
 import pathlib
 
-
 QUERY_RESPONSE = {
     "ok": True,
     "database": "data",
@@ -42,9 +41,13 @@ def test_token_flag_overrides_datasette_token(httpx_mock, mocker, tmpdir):
     result = runner.invoke(
         cli,
         [
-            "query", "data", "select 1",
-            "-i", "https://example.com",
-            "--token", "flag-token",
+            "query",
+            "data",
+            "select 1",
+            "-i",
+            "https://example.com",
+            "--token",
+            "flag-token",
         ],
     )
     assert result.exit_code == 0

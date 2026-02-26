@@ -153,7 +153,9 @@ def get(path, instance, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     full_url = url.rstrip("/") + "/" + path.lstrip("/")
     response = _make_request(url, token, "/" + path.lstrip("/"))
     if response.status_code != 200:
@@ -180,7 +182,9 @@ def databases(instance, _json, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     response = _make_request(url, token, "/.json")
     if response.status_code != 200:
         raise click.ClickException(f"{response.status_code} error")
@@ -219,10 +223,21 @@ def tables(instance, database, views, views_only, hidden, _json, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    instance_alias = _instance_alias_for_url(url, config_dir / "config.json") if not (instance and (instance.startswith("http://") or instance.startswith("https://"))) else None
-    if instance and not (instance.startswith("http://") or instance.startswith("https://")):
+    instance_alias = (
+        _instance_alias_for_url(url, config_dir / "config.json")
+        if not (
+            instance
+            and (instance.startswith("http://") or instance.startswith("https://"))
+        )
+        else None
+    )
+    if instance and not (
+        instance.startswith("http://") or instance.startswith("https://")
+    ):
         instance_alias = instance
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     db = _resolve_database(database, instance_alias, config_dir / "config.json")
     response = _make_request(url, token, f"/{db}.json")
     if response.status_code != 200:
@@ -277,7 +292,9 @@ def query(database, sql, instance, token, verbose):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     query_url = url.rstrip("/") + "/" + database + ".json"
     headers = {}
     if token:
@@ -285,7 +302,9 @@ def query(database, sql, instance, token, verbose):
     params = {"sql": sql, "_shape": "objects"}
     if verbose:
         click.echo(query_url + "?" + urllib.parse.urlencode(params), err=True)
-    response = httpx.get(query_url, params=params, headers=headers, follow_redirects=True)
+    response = httpx.get(
+        query_url, params=params, headers=headers, follow_redirects=True
+    )
 
     if response.status_code != 200:
         try:
@@ -322,14 +341,35 @@ def query(database, sql, instance, token, verbose):
     click.echo(json.dumps(response.json()["rows"], indent=2))
 
 
-def _do_insert(database, table, filepath, format_csv, format_tsv, format_json,
-               format_nl, encoding, no_detect_types, replace, ignore, create,
-               alter, pks, batch_size, interval, token, silent, verbose,
-               instance, endpoint="insert"):
+def _do_insert(
+    database,
+    table,
+    filepath,
+    format_csv,
+    format_tsv,
+    format_json,
+    format_nl,
+    encoding,
+    no_detect_types,
+    replace,
+    ignore,
+    create,
+    alter,
+    pks,
+    batch_size,
+    interval,
+    token,
+    silent,
+    verbose,
+    instance,
+    endpoint="insert",
+):
     """Shared implementation for insert and upsert commands."""
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
 
     format = None
     if format_csv:
@@ -420,20 +460,29 @@ _insert_options = [
     click.argument("database"),
     click.argument("table"),
     click.argument(
-        "filepath", type=click.Path("rb", readable=True, allow_dash=True, dir_okay=False)
+        "filepath",
+        type=click.Path("rb", readable=True, allow_dash=True, dir_okay=False),
     ),
-    click.option("-i", "--instance", default=None, help="Datasette instance URL or alias"),
+    click.option(
+        "-i", "--instance", default=None, help="Datasette instance URL or alias"
+    ),
     click.option("format_csv", "--csv", is_flag=True, help="Input is CSV"),
     click.option("format_tsv", "--tsv", is_flag=True, help="Input is TSV"),
     click.option("format_json", "--json", is_flag=True, help="Input is JSON"),
-    click.option("format_nl", "--nl", is_flag=True, help="Input is newline-delimited JSON"),
+    click.option(
+        "format_nl", "--nl", is_flag=True, help="Input is newline-delimited JSON"
+    ),
     click.option("--encoding", help="Character encoding for CSV/TSV"),
     click.option(
         "--no-detect-types", is_flag=True, help="Don't detect column types for CSV/TSV"
     ),
-    click.option("--alter", is_flag=True, help="Alter table to add any missing columns"),
     click.option(
-        "pks", "--pk", multiple=True,
+        "--alter", is_flag=True, help="Alter table to add any missing columns"
+    ),
+    click.option(
+        "pks",
+        "--pk",
+        multiple=True,
         help="Columns to use as the primary key when creating the table",
     ),
     click.option(
@@ -445,7 +494,9 @@ _insert_options = [
     click.option("--token", "-t", help="API token"),
     click.option("--silent", is_flag=True, help="Don't output progress"),
     click.option(
-        "-v", "--verbose", is_flag=True,
+        "-v",
+        "--verbose",
+        is_flag=True,
         help="Verbose output: show HTTP request and response",
     ),
 ]
@@ -456,17 +507,39 @@ def _apply_options(options):
         for option in reversed(options):
             func = option(func)
         return func
+
     return decorator
 
 
 @cli.command()
 @_apply_options(_insert_options)
-@click.option("--replace", is_flag=True, help="Replace rows with a matching primary key")
+@click.option(
+    "--replace", is_flag=True, help="Replace rows with a matching primary key"
+)
 @click.option("--ignore", is_flag=True, help="Ignore rows with a matching primary key")
 @click.option("--create", is_flag=True, help="Create table if it does not exist")
-def insert(database, table, filepath, instance, format_csv, format_tsv, format_json,
-           format_nl, encoding, no_detect_types, alter, pks, batch_size, interval,
-           token, silent, verbose, replace, ignore, create):
+def insert(
+    database,
+    table,
+    filepath,
+    instance,
+    format_csv,
+    format_tsv,
+    format_json,
+    format_nl,
+    encoding,
+    no_detect_types,
+    alter,
+    pks,
+    batch_size,
+    interval,
+    token,
+    silent,
+    verbose,
+    replace,
+    ignore,
+    create,
+):
     """
     Insert data into a remote Datasette instance
 
@@ -476,17 +549,52 @@ def insert(database, table, filepath, instance, format_csv, format_tsv, format_j
         dclient insert main mytable data.csv --csv -i myapp
         dclient insert main mytable data.csv --csv --create --pk id
     """
-    _do_insert(database, table, filepath, format_csv, format_tsv, format_json,
-               format_nl, encoding, no_detect_types, replace, ignore, create,
-               alter, pks, batch_size, interval, token, silent, verbose,
-               instance, endpoint="insert")
+    _do_insert(
+        database,
+        table,
+        filepath,
+        format_csv,
+        format_tsv,
+        format_json,
+        format_nl,
+        encoding,
+        no_detect_types,
+        replace,
+        ignore,
+        create,
+        alter,
+        pks,
+        batch_size,
+        interval,
+        token,
+        silent,
+        verbose,
+        instance,
+        endpoint="insert",
+    )
 
 
 @cli.command()
 @_apply_options(_insert_options)
-def upsert(database, table, filepath, instance, format_csv, format_tsv, format_json,
-           format_nl, encoding, no_detect_types, alter, pks, batch_size, interval,
-           token, silent, verbose):
+def upsert(
+    database,
+    table,
+    filepath,
+    instance,
+    format_csv,
+    format_tsv,
+    format_json,
+    format_nl,
+    encoding,
+    no_detect_types,
+    alter,
+    pks,
+    batch_size,
+    interval,
+    token,
+    silent,
+    verbose,
+):
     """
     Upsert data into a remote Datasette instance
 
@@ -495,10 +603,29 @@ def upsert(database, table, filepath, instance, format_csv, format_tsv, format_j
     \b
         dclient upsert main mytable data.csv --csv -i myapp
     """
-    _do_insert(database, table, filepath, format_csv, format_tsv, format_json,
-               format_nl, encoding, no_detect_types, False, False, False,
-               alter, pks, batch_size, interval, token, silent, verbose,
-               instance, endpoint="upsert")
+    _do_insert(
+        database,
+        table,
+        filepath,
+        format_csv,
+        format_tsv,
+        format_json,
+        format_nl,
+        encoding,
+        no_detect_types,
+        False,
+        False,
+        False,
+        alter,
+        pks,
+        batch_size,
+        interval,
+        token,
+        silent,
+        verbose,
+        instance,
+        endpoint="upsert",
+    )
 
 
 @cli.command()
@@ -520,10 +647,21 @@ def schema(table_name, instance, database, _json, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    instance_alias = _instance_alias_for_url(url, config_dir / "config.json") if not (instance and (instance.startswith("http://") or instance.startswith("https://"))) else None
-    if instance and not (instance.startswith("http://") or instance.startswith("https://")):
+    instance_alias = (
+        _instance_alias_for_url(url, config_dir / "config.json")
+        if not (
+            instance
+            and (instance.startswith("http://") or instance.startswith("https://"))
+        )
+        else None
+    )
+    if instance and not (
+        instance.startswith("http://") or instance.startswith("https://")
+    ):
         instance_alias = instance
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     db = _resolve_database(database, instance_alias, config_dir / "config.json")
     if table_name:
         response = _make_request(url, token, f"/{db}/{table_name}/-/schema.json")
@@ -554,7 +692,9 @@ def plugins(instance, _json, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     response = _make_request(url, token, "/-/plugins.json")
     if response.status_code != 200:
         raise click.ClickException(f"{response.status_code} error")
@@ -582,7 +722,9 @@ def actor(instance, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     response = _make_request(url, token, "/-/actor.json")
     response.raise_for_status()
     click.echo(json.dumps(response.json(), indent=4))
@@ -598,10 +740,21 @@ def default_query(sql, instance, database, token, verbose):
     """Run a SQL query using default instance and database."""
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    instance_alias = _instance_alias_for_url(url, config_dir / "config.json") if not (instance and (instance.startswith("http://") or instance.startswith("https://"))) else None
-    if instance and not (instance.startswith("http://") or instance.startswith("https://")):
+    instance_alias = (
+        _instance_alias_for_url(url, config_dir / "config.json")
+        if not (
+            instance
+            and (instance.startswith("http://") or instance.startswith("https://"))
+        )
+        else None
+    )
+    if instance and not (
+        instance.startswith("http://") or instance.startswith("https://")
+    ):
         instance_alias = instance
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     db = _resolve_database(database, instance_alias, config_dir / "config.json")
     query_url = url.rstrip("/") + "/" + db + ".json"
     headers = {}
@@ -610,7 +763,9 @@ def default_query(sql, instance, database, token, verbose):
     params = {"sql": sql, "_shape": "objects"}
     if verbose:
         click.echo(query_url + "?" + urllib.parse.urlencode(params), err=True)
-    response = httpx.get(query_url, params=params, headers=headers, follow_redirects=True)
+    response = httpx.get(
+        query_url, params=params, headers=headers, follow_redirects=True
+    )
 
     if response.status_code != 200:
         try:
@@ -668,7 +823,11 @@ def instances(_json):
     else:
         for name, inst in inst_map.items():
             marker = "* " if name == default else "  "
-            db_info = f" (db: {inst['default_database']})" if inst.get("default_database") else ""
+            db_info = (
+                f" (db: {inst['default_database']})"
+                if inst.get("default_database")
+                else ""
+            )
             click.echo(f"{marker}{name} = {inst['url']}{db_info}")
 
 
@@ -693,7 +852,11 @@ def alias_list(_json):
     else:
         for name, inst in instances.items():
             marker = "* " if name == default else "  "
-            db_info = f" (db: {inst['default_database']})" if inst.get("default_database") else ""
+            db_info = (
+                f" (db: {inst['default_database']})"
+                if inst.get("default_database")
+                else ""
+            )
             click.echo(f"{marker}{name} = {inst['url']}{db_info}")
 
 
@@ -891,10 +1054,114 @@ def auth_status(instance, token):
     """
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
-    token = _resolve_token(token, url, config_dir / "auth.json", config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
     response = _make_request(url, token, "/-/actor.json")
     response.raise_for_status()
     click.echo(json.dumps(response.json(), indent=4))
+
+
+# -- login command (OAuth device flow) --
+
+
+@cli.command()
+@click.argument("alias_or_url", required=False, default=None)
+@click.option("--scope", default=None, help="JSON scope array")
+def login(alias_or_url, scope):
+    """
+    Authenticate with a Datasette instance using OAuth
+
+    Uses the OAuth device flow: opens a URL in your browser where you
+    approve access, then saves the resulting API token.
+
+    Example usage:
+
+    \b
+        dclient login https://simon.datasette.cloud/
+        dclient login myalias
+        dclient login
+    """
+    config_dir = get_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "config.json"
+
+    if alias_or_url is None:
+        click.echo("Enter the URL of your Datasette instance, or an alias you have")
+        click.echo("already configured with 'dclient alias add'.\n")
+        alias_or_url = click.prompt("Instance URL or alias")
+
+    # Resolve alias to URL if needed
+    if alias_or_url.startswith("http://") or alias_or_url.startswith("https://"):
+        url = alias_or_url
+        auth_key = alias_or_url
+    else:
+        url = _resolve_instance(alias_or_url, config_file)
+        auth_key = alias_or_url
+
+    # Ensure trailing slash
+    if not url.endswith("/"):
+        url += "/"
+
+    # Step 1: Request device code
+    device_url = url + "-/oauth/device"
+    data = {}
+    if scope:
+        data["scope"] = scope
+    response = httpx.post(device_url, data=data, timeout=30.0)
+    if response.status_code != 200:
+        raise click.ClickException(
+            f"Failed to start login flow: {response.status_code} from {device_url}"
+        )
+    device_data = response.json()
+    device_code = device_data["device_code"]
+    user_code = device_data["user_code"]
+    verification_uri = device_data["verification_uri"]
+    interval = device_data.get("interval", 5)
+
+    # Step 2: Show instructions
+    click.echo(f"\nOpen this URL in your browser:\n")
+    click.echo(f"    {verification_uri}\n")
+    click.echo(f"Enter this code: {user_code}\n")
+    click.echo("Waiting for authorization...", nl=False)
+
+    # Step 3: Poll for token
+    token_url = url + "-/oauth/token"
+    while True:
+        time.sleep(interval)
+        click.echo(".", nl=False)
+        token_response = httpx.post(
+            token_url,
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "device_code": device_code,
+            },
+            timeout=30.0,
+        )
+        token_data = token_response.json()
+        if "access_token" in token_data:
+            break
+        error = token_data.get("error")
+        if error == "authorization_pending":
+            continue
+        elif error == "access_denied":
+            click.echo()
+            raise click.ClickException("Authorization denied.")
+        elif error == "expired_token":
+            click.echo()
+            raise click.ClickException("Device code expired. Run login again.")
+        else:
+            click.echo()
+            raise click.ClickException(f"Unexpected error: {error}")
+
+    # Step 4: Save token
+    click.echo()
+    access_token = token_data["access_token"]
+    auth_file = config_dir / "auth.json"
+    auths = _load_auths(auth_file)
+    auths[auth_key] = access_token
+    auth_file.write_text(json.dumps(auths, indent=4))
+    click.echo(f"Login successful. Token saved for {auth_key}")
 
 
 # -- v1 → v2 migration --
@@ -947,7 +1214,6 @@ def _migrate_v1_to_v2(config_dir):
     aliases_file.rename(config_dir / "aliases.json.bak")
 
 
-
 def _batches(iterable, size, interval=None):
     iterable = iter(iterable)
     last_yield_time = time.time()
@@ -967,8 +1233,18 @@ def _batches(iterable, size, interval=None):
 
 
 def _insert_batch(
-    *, url, table, batch, token, create, alter, pks, replace, ignore, verbose,
-    endpoint="insert"
+    *,
+    url,
+    table,
+    batch,
+    token,
+    create,
+    alter,
+    pks,
+    replace,
+    ignore,
+    verbose,
+    endpoint="insert",
 ):
     if create:
         data = {

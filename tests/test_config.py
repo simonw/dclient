@@ -12,7 +12,6 @@ import json
 import pathlib
 import pytest
 
-
 # -- Config loading/saving --
 
 
@@ -196,7 +195,9 @@ def test_resolve_token_from_flag(tmpdir):
     """An explicit --token flag is used directly."""
     auth_file = pathlib.Path(tmpdir) / "auth.json"
     config_file = pathlib.Path(tmpdir) / "config.json"
-    token = _resolve_token("explicit-token", "https://example.com", auth_file, config_file)
+    token = _resolve_token(
+        "explicit-token", "https://example.com", auth_file, config_file
+    )
     assert token == "explicit-token"
 
 
@@ -218,7 +219,9 @@ def test_resolve_token_from_auth_by_alias(tmpdir):
             }
         )
     )
-    token = _resolve_token(None, "https://myapp.datasette.cloud", auth_file, config_file)
+    token = _resolve_token(
+        None, "https://myapp.datasette.cloud", auth_file, config_file
+    )
     assert token == "tok123"
 
 
