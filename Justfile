@@ -1,37 +1,29 @@
 # Run tests and linters
 @default: test lint
 
-# Install dependencies and test dependencies
-@init:
-  pipenv run pip install -e '.[test]'
-
 # Run pytest with supplied options
 @test *options:
-  pipenv run pytest {{options}}
+  uv run pytest {{options}}
 
 # Run linters
 @lint:
   echo "Linters..."
-  echo "  Black"
-  pipenv run black . --check
   echo "  cog"
-  pipenv run cog --check README.md docs/*.md
-  echo "  ruff"
-  pipenv run ruff .
+  uv run cog --check README.md docs/*.md
+  echo "  ruff check"
+  uv run ruff check .
+  echo "  ruff format"
+  uv run ruff format . --check
 
 # Rebuild docs with cog
 @cog:
-  pipenv run cog -r docs/*.md
+  uv run cog -r docs/*.md
 
 # Serve live docs on localhost:8000
 @docs: cog
-  cd docs && pipenv run make livehtml
+  cd docs && uv run make livehtml
 
-# Apply Black
-@black:
-  pipenv run black .
-
-# Run automatic fixes
+# Apply ruff fixes and formatting
 @fix: cog
-  pipenv run ruff . --fix
-  pipenv run black .
+  uv run ruff check . --fix
+  uv run ruff format .

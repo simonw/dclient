@@ -26,13 +26,24 @@ dclient = "dclient.cli:cli"
 client = "dclient.plugin"
 
 [dependency-groups]
-dev = [
+test = [
     "pytest",
     "pytest-asyncio",
     "pytest-httpx",
     "cogapp",
     "pytest-mock",
     "datasette>=1.0a25",
+]
+docs = [
+    "furo",
+    "sphinx-autobuild",
+    "sphinx-copybutton",
+    "myst-parser",
+    "cogapp",
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "docs"},
 ]
 
 [tool.uv.build-backend]
