@@ -132,7 +132,7 @@ Options:
                         table
   --batch-size INTEGER  Send rows in batches of this size
   --interval FLOAT      Send batch at least every X seconds
-  -t, --token TEXT      API token
+  --token TEXT          API token
   --silent              Don't output progress
   -v, --verbose         Verbose output: show HTTP request and response
   --replace             Replace rows with a matching primary key
@@ -174,7 +174,7 @@ Options:
                         table
   --batch-size INTEGER  Send rows in batches of this size
   --interval FLOAT      Send batch at least every X seconds
-  -t, --token TEXT      API token
+  --token TEXT          API token
   --silent              Don't output progress
   -v, --verbose         Verbose output: show HTTP request and response
   --help                Show this message and exit.

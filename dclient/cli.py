@@ -1,6 +1,8 @@
 import click
 from click_default_group import DefaultGroup
+import csv
 import httpx
+import io
 import json
 import os
 import pathlib
@@ -121,6 +123,83 @@ def _resolve_token(token, url, auth_file, config_file):
     if stored is not None:
         return stored
     return os.environ.get("DATASETTE_TOKEN")
+
+
+def _output_rows(rows, fmt, columns=None):
+    """Output rows in the specified format. fmt is one of 'json', 'csv', 'tsv', 'nl', 'table'."""
+    if fmt == "csv":
+        _output_csv(rows, columns)
+    elif fmt == "tsv":
+        _output_csv(rows, columns, delimiter="\t")
+    elif fmt == "nl":
+        for row in rows:
+            click.echo(json.dumps(row, default=str))
+    elif fmt == "table":
+        _output_table(rows, columns)
+    else:
+        click.echo(json.dumps(rows, indent=2, default=str))
+
+
+def _output_csv(rows, columns=None, delimiter=","):
+    if not rows and not columns:
+        return
+    if columns is None:
+        columns = list(rows[0].keys()) if rows else []
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=delimiter)
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow(str(row.get(col, "")) for col in columns)
+    click.echo(buf.getvalue(), nl=False)
+
+
+def _output_table(rows, columns=None):
+    if not rows and not columns:
+        return
+    if columns is None:
+        columns = list(rows[0].keys()) if rows else []
+    if not columns:
+        return
+    # Calculate column widths
+    widths = {col: len(str(col)) for col in columns}
+    for row in rows:
+        for col in columns:
+            widths[col] = max(widths[col], len(str(row.get(col, ""))))
+    # Header
+    header = "  ".join(str(col).ljust(widths[col]) for col in columns)
+    click.echo(header)
+    # Separator
+    sep = "  ".join("-" * widths[col] for col in columns)
+    click.echo(sep)
+    # Rows
+    for row in rows:
+        line = "  ".join(str(row.get(col, "")).ljust(widths[col]) for col in columns)
+        click.echo(line)
+
+
+def _determine_output_format(fmt_csv, fmt_tsv, fmt_nl, fmt_table):
+    if fmt_csv:
+        return "csv"
+    if fmt_tsv:
+        return "tsv"
+    if fmt_nl:
+        return "nl"
+    if fmt_table:
+        return "table"
+    return "json"
+
+
+def output_format_options(f):
+    """Decorator that adds --csv, --tsv, --nl, --table options to a command."""
+    f = click.option(
+        "fmt_table", "--table", "-t", is_flag=True, help="Output as ASCII table"
+    )(f)
+    f = click.option(
+        "fmt_nl", "--nl", is_flag=True, help="Output as newline-delimited JSON"
+    )(f)
+    f = click.option("fmt_tsv", "--tsv", is_flag=True, help="Output as TSV")(f)
+    f = click.option("fmt_csv", "--csv", is_flag=True, help="Output as CSV")(f)
+    return f
 
 
 @click.group(cls=DefaultGroup, default="default_query", default_if_no_args=False)
@@ -286,7 +365,8 @@ def tables(instance, database, views, views_only, hidden, _json, token):
 @click.option("-i", "--instance", default=None, help="Datasette instance URL or alias")
 @click.option("--token", help="API token")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request")
-def query(database, sql, instance, token, verbose):
+@output_format_options
+def query(database, sql, instance, token, verbose, fmt_csv, fmt_tsv, fmt_nl, fmt_table):
     """
     Run a SQL query against a Datasette database
 
@@ -346,7 +426,10 @@ def query(database, sql, instance, token, verbose):
             bits = [json.dumps(data)]
         raise click.ClickException(": ".join(bits))
 
-    click.echo(json.dumps(response.json()["rows"], indent=2))
+    rows = response.json()["rows"]
+    columns = response.json().get("columns")
+    fmt = _determine_output_format(fmt_csv, fmt_tsv, fmt_nl, fmt_table)
+    _output_rows(rows, fmt, columns)
 
 
 def _do_insert(
@@ -499,7 +582,7 @@ _insert_options = [
     click.option(
         "--interval", type=float, default=10, help="Send batch at least every X seconds"
     ),
-    click.option("--token", "-t", help="API token"),
+    click.option("--token", help="API token"),
     click.option("--silent", is_flag=True, help="Don't output progress"),
     click.option(
         "-v",
@@ -744,7 +827,10 @@ def actor(instance, token):
 @click.option("-d", "--database", default=None, help="Database name")
 @click.option("--token", help="API token")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request")
-def default_query(sql, instance, database, token, verbose):
+@output_format_options
+def default_query(
+    sql, instance, database, token, verbose, fmt_csv, fmt_tsv, fmt_nl, fmt_table
+):
     """Run a SQL query using default instance and database."""
     config_dir = get_config_dir()
     url = _resolve_instance(instance, config_dir / "config.json")
@@ -807,7 +893,10 @@ def default_query(sql, instance, database, token, verbose):
             bits = [json.dumps(data)]
         raise click.ClickException(": ".join(bits))
 
-    click.echo(json.dumps(response.json()["rows"], indent=2))
+    rows = response.json()["rows"]
+    columns = response.json().get("columns")
+    fmt = _determine_output_format(fmt_csv, fmt_tsv, fmt_nl, fmt_table)
+    _output_rows(rows, fmt, columns)
 
 
 @cli.command()
