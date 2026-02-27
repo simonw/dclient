@@ -12,6 +12,60 @@ dclient query fixtures "select * from facetable" --token dstok_mytoken -i latest
 
 A more convenient way to handle this is to store tokens for your aliases.
 
+## Logging in with OAuth
+
+The easiest way to authenticate is using the `dclient login` command, which uses the OAuth device flow to obtain and store a token.
+
+This requires the Datasette instance to be running the [datasette-oauth](https://github.com/datasette/datasette-oauth) plugin with [device flow enabled](https://github.com/datasette/datasette-oauth?tab=readme-ov-file#plugin-configuration).
+
+```bash
+dclient login https://my-datasette.example.com/
+dclient login myalias
+dclient login
+```
+
+This will display a URL and a code. Open the URL in your browser, enter the code to approve access, and the resulting API token will be saved automatically. If you run `dclient login` without an argument, you will be prompted for the instance URL or alias.
+
+You can also pass a `--scope` option to request specific permissions:
+
+```bash
+dclient login myalias --scope '[["view-instance"]]'
+```
+
+## dclient login --help
+
+<!-- [[[cog
+import cog
+from dclient import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["login", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient login [OPTIONS] [ALIAS_OR_URL]
+
+  Authenticate with a Datasette instance using OAuth
+
+  Uses the OAuth device flow: opens a URL in your browser where you approve
+  access, then saves the resulting API token.
+
+  Example usage:
+
+      dclient login https://simon.datasette.cloud/
+      dclient login myalias
+      dclient login
+
+Options:
+  --scope TEXT  JSON scope array
+  --help        Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
 ## Using stored tokens
 
 To store a token for an alias:
