@@ -1,4 +1,4 @@
-"""Tests for v2 alias command: default, default-db subcommands."""
+"""Tests for v2 defaults command: instance and database subcommands."""
 
 from click.testing import CliRunner
 from dclient.cli import cli
@@ -15,16 +15,16 @@ def test_alias_default_workflow(mocker, tmpdir):
     assert result.exit_code == 0
 
     # No default yet
-    result = runner.invoke(cli, ["alias", "default"])
+    result = runner.invoke(cli, ["default", "instance"])
     assert result.exit_code == 0
     assert "No default instance set" in result.output
 
     # Set default
-    result = runner.invoke(cli, ["alias", "default", "prod"])
+    result = runner.invoke(cli, ["default", "instance", "prod"])
     assert result.exit_code == 0
 
     # Show default
-    result = runner.invoke(cli, ["alias", "default"])
+    result = runner.invoke(cli, ["default", "instance"])
     assert result.exit_code == 0
     assert result.output.strip() == "prod"
 
@@ -34,17 +34,17 @@ def test_alias_default_workflow(mocker, tmpdir):
     assert "* prod" in result.output
 
     # Clear default
-    result = runner.invoke(cli, ["alias", "default", "--clear"])
+    result = runner.invoke(cli, ["default", "instance", "--clear"])
     assert result.exit_code == 0
 
-    result = runner.invoke(cli, ["alias", "default"])
+    result = runner.invoke(cli, ["default", "instance"])
     assert "No default instance set" in result.output
 
 
 def test_alias_default_unknown_alias(mocker, tmpdir):
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
     runner = CliRunner()
-    result = runner.invoke(cli, ["alias", "default", "nonexistent"])
+    result = runner.invoke(cli, ["default", "instance", "nonexistent"])
     assert result.exit_code == 1
     assert "No such alias" in result.output
 
@@ -58,16 +58,16 @@ def test_alias_default_db_workflow(mocker, tmpdir):
     assert result.exit_code == 0
 
     # No default database yet
-    result = runner.invoke(cli, ["alias", "default-db", "prod"])
+    result = runner.invoke(cli, ["default", "database", "prod"])
     assert result.exit_code == 0
     assert "No default database set" in result.output
 
     # Set default database
-    result = runner.invoke(cli, ["alias", "default-db", "prod", "main"])
+    result = runner.invoke(cli, ["default", "database", "prod", "main"])
     assert result.exit_code == 0
 
     # Show default database
-    result = runner.invoke(cli, ["alias", "default-db", "prod"])
+    result = runner.invoke(cli, ["default", "database", "prod"])
     assert result.exit_code == 0
     assert result.output.strip() == "main"
 
@@ -76,17 +76,17 @@ def test_alias_default_db_workflow(mocker, tmpdir):
     assert "(db: main)" in result.output
 
     # Clear default database
-    result = runner.invoke(cli, ["alias", "default-db", "prod", "--clear"])
+    result = runner.invoke(cli, ["default", "database", "prod", "--clear"])
     assert result.exit_code == 0
 
-    result = runner.invoke(cli, ["alias", "default-db", "prod"])
+    result = runner.invoke(cli, ["default", "database", "prod"])
     assert "No default database set" in result.output
 
 
 def test_alias_default_db_unknown_alias(mocker, tmpdir):
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
     runner = CliRunner()
-    result = runner.invoke(cli, ["alias", "default-db", "nonexistent", "main"])
+    result = runner.invoke(cli, ["default", "database", "nonexistent", "main"])
     assert result.exit_code == 1
     assert "No such alias" in result.output
 
@@ -97,7 +97,7 @@ def test_alias_remove_clears_default(mocker, tmpdir):
     runner = CliRunner()
 
     runner.invoke(cli, ["alias", "add", "prod", "https://prod.example.com"])
-    runner.invoke(cli, ["alias", "default", "prod"])
+    runner.invoke(cli, ["default", "instance", "prod"])
 
     # Verify it's set
     config = json.loads((pathlib.Path(tmpdir) / "config.json").read_text())
@@ -109,3 +109,31 @@ def test_alias_remove_clears_default(mocker, tmpdir):
     config = json.loads((pathlib.Path(tmpdir) / "config.json").read_text())
     assert config["default_instance"] is None
     assert "prod" not in config["instances"]
+
+
+def test_default_instance_accepts_url(mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    runner = CliRunner()
+
+    runner.invoke(cli, ["alias", "add", "prod", "https://prod.example.com"])
+    result = runner.invoke(cli, ["default", "instance", "https://prod.example.com"])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli, ["default", "instance"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "prod"
+
+
+def test_default_database_accepts_url(mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    runner = CliRunner()
+
+    runner.invoke(cli, ["alias", "add", "prod", "https://prod.example.com"])
+    result = runner.invoke(
+        cli, ["default", "database", "https://prod.example.com", "main"]
+    )
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli, ["default", "database", "prod"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "main"

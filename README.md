@@ -32,8 +32,8 @@ datasette install dclient
 Add an alias for a Datasette instance:
 ```bash
 dclient alias add latest https://latest.datasette.io
-dclient alias default latest
-dclient alias default-db latest fixtures
+dclient default instance latest
+dclient default database latest fixtures
 ```
 Now run queries directly:
 ```bash

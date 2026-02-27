@@ -35,6 +35,7 @@ maxdepth: 3
 ---
 queries
 aliases
+defaults
 authentication
 inserting
 environment

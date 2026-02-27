@@ -53,8 +53,11 @@ def _resolve_instance(instance, config_file):
         )
     # Try config default
     default = config.get("default_instance")
-    if default and default in config.get("instances", {}):
-        return config["instances"][default]["url"]
+    if default:
+        if default in config.get("instances", {}):
+            return config["instances"][default]["url"]
+        if default.startswith("http://") or default.startswith("https://"):
+            return default.rstrip("/")
     # Try env var
     env_url = os.environ.get("DATASETTE_URL")
     if env_url:
@@ -62,7 +65,7 @@ def _resolve_instance(instance, config_file):
     raise click.ClickException(
         "No instance specified. Use -i <url-or-alias>, or configure a default:\n\n"
         "    dclient alias add <name> <url>\n"
-        "    dclient alias default <name>\n\n"
+        "    dclient default instance <name-or-url>\n\n"
         "Or set the DATASETTE_URL environment variable."
     )
 
@@ -75,8 +78,13 @@ def _resolve_database(database, instance_alias, config_file):
     if instance_alias:
         config = _load_config(config_file)
         instances = config.get("instances", {})
-        if instance_alias in instances:
-            default_db = instances[instance_alias].get("default_database")
+        key = instance_alias
+        if key not in instances and (
+            key.startswith("http://") or key.startswith("https://")
+        ):
+            key = _instance_alias_for_url(key, config_file)
+        if key in instances:
+            default_db = instances[key].get("default_database")
             if default_db:
                 return default_db
     # Try env var
@@ -85,7 +93,7 @@ def _resolve_database(database, instance_alias, config_file):
         return env_db
     raise click.ClickException(
         "No database specified. Use -d <name>, or configure a default:\n\n"
-        "    dclient alias default-db <alias> <database>\n\n"
+        "    dclient default database <alias-or-url> <database>\n\n"
         "Or set the DATASETTE_DATABASE environment variable."
     )
 
@@ -902,29 +910,56 @@ def alias_remove(name):
         raise click.ClickException("No such alias")
 
 
-@alias.command(name="default")
-@click.argument("name", required=False, default=None)
+def _resolve_instance_key(alias_or_url, config):
+    instances = config.get("instances", {})
+    if alias_or_url in instances:
+        return alias_or_url
+    if alias_or_url.startswith("http://") or alias_or_url.startswith("https://"):
+        normalized = alias_or_url.rstrip("/")
+        for name, inst in instances.items():
+            if inst.get("url", "").rstrip("/") == normalized:
+                return name
+        raise click.ClickException(f"No such instance URL: {alias_or_url}")
+    raise click.ClickException(f"No such alias: {alias_or_url}")
+
+
+# -- default command group --
+
+
+@cli.group()
+def default():
+    "Manage default instance and database"
+
+
+@default.command(name="instance")
+@click.argument("alias_or_url", required=False, default=None)
 @click.option("--clear", is_flag=True, help="Clear default instance")
-def alias_default(name, clear):
+def default_instance(alias_or_url, clear):
     """
     Set or show the default instance
 
     Example usage:
 
     \b
-        dclient alias default prod
-        dclient alias default
-        dclient alias default --clear
+        dclient default instance prod
+        dclient default instance https://myapp.datasette.cloud
+        dclient default instance
+        dclient default instance --clear
     """
     config_file = get_config_dir() / "config.json"
     config = _load_config(config_file)
     if clear:
         config["default_instance"] = None
         _save_config(config_file, config)
-    elif name:
-        if name not in config.get("instances", {}):
-            raise click.ClickException(f"No such alias: {name}")
-        config["default_instance"] = name
+    elif alias_or_url:
+        if alias_or_url.startswith("http://") or alias_or_url.startswith("https://"):
+            try:
+                key = _resolve_instance_key(alias_or_url, config)
+            except click.ClickException:
+                key = alias_or_url.rstrip("/")
+        else:
+            key = _resolve_instance_key(alias_or_url, config)
+        config["default_instance"] = key
         _save_config(config_file, config)
     else:
         default = config.get("default_instance")
@@ -934,37 +969,37 @@ def alias_default(name, clear):
             click.echo("No default instance set")
 
 
-@alias.command(name="default-db")
-@click.argument("alias_name")
+@default.command(name="database")
+@click.argument("alias_or_url")
 @click.argument("db", required=False, default=None)
-@click.option("--clear", is_flag=True, help="Clear default database for this alias")
-def alias_default_db(alias_name, db, clear):
+@click.option("--clear", is_flag=True, help="Clear default database for this instance")
+def default_database(alias_or_url, db, clear):
     """
-    Set or show the default database for an alias
+    Set or show the default database for an instance
 
     Example usage:
 
     \b
-        dclient alias default-db prod main
-        dclient alias default-db prod
-        dclient alias default-db prod --clear
+        dclient default database prod main
+        dclient default database https://myapp.datasette.cloud main
+        dclient default database prod
+        dclient default database prod --clear
     """
     config_file = get_config_dir() / "config.json"
     config = _load_config(config_file)
-    if alias_name not in config.get("instances", {}):
-        raise click.ClickException(f"No such alias: {alias_name}")
+    instance_key = _resolve_instance_key(alias_or_url, config)
     if clear:
-        config["instances"][alias_name]["default_database"] = None
+        config["instances"][instance_key]["default_database"] = None
         _save_config(config_file, config)
     elif db:
-        config["instances"][alias_name]["default_database"] = db
+        config["instances"][instance_key]["default_database"] = db
         _save_config(config_file, config)
     else:
-        default_db = config["instances"][alias_name].get("default_database")
+        default_db = config["instances"][instance_key].get("default_database")
         if default_db:
             click.echo(default_db)
         else:
-            click.echo(f"No default database set for {alias_name}")
+            click.echo(f"No default database set for {instance_key}")
 
 
 # -- auth command group --
