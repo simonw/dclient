@@ -240,13 +240,13 @@ Usage: dclient create-table [OPTIONS] DATABASE TABLE_NAME
         --column id integer --column name text --pk id
 
 Options:
-  --column TEXT...     Column definition: name type (e.g. --column id integer
-                       --column name text)
-  --pk TEXT            Column(s) to use as primary key
-  -i, --instance TEXT  Datasette instance URL or alias
-  --token TEXT         API token
-  -v, --verbose        Verbose output: show HTTP request and response
-  --help               Show this message and exit.
+  -c, --column TEXT...  Column definition: name type (e.g. --column id integer
+                        --column name text)
+  --pk TEXT             Column(s) to use as primary key
+  -i, --instance TEXT   Datasette instance URL or alias
+  --token TEXT          API token
+  -v, --verbose         Verbose output: show HTTP request and response
+  --help                Show this message and exit.
 
 ```
 <!-- [[[end]]] -->
