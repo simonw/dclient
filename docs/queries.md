@@ -36,6 +36,121 @@ You can override just the database with `-d`:
 dclient "select * from counters" -d counters
 ```
 
+## Browsing rows
+
+The `dclient rows` command lets you browse table data without writing SQL:
+
+```bash
+dclient rows fixtures facet_cities -i https://latest.datasette.io -t
+```
+```
+id  name
+--  -------------
+3   Detroit
+2   Los Angeles
+4   Memnonia
+1   San Francisco
+```
+
+If you have a default instance and database configured, you can just pass the table name:
+
+```bash
+dclient rows facet_cities -t
+```
+
+### Filtering
+
+Use `-f` / `--filter` with three arguments: column, operation, value:
+
+```bash
+dclient rows facet_cities -f id gte 3 -t
+dclient rows facet_cities -f name eq Detroit
+dclient rows facet_cities -f name contains M -f id gt 2
+```
+
+The operation is passed directly to Datasette as a column filter suffix. Built-in Datasette operations include `exact`, `not`, `gt`, `gte`, `lt`, `lte`, `contains`, `like`, `startswith`, `endswith`, `glob`, `isnull`, `notnull`, and more. `eq` is a convenience alias for `exact`. Operations added by Datasette plugins will work too.
+
+### Sorting
+
+```bash
+dclient rows dogs --sort age
+dclient rows dogs --sort-desc age
+```
+
+### Column selection
+
+```bash
+dclient rows dogs --col name --col age
+dclient rows dogs --nocol id
+```
+
+### Search
+
+Full-text search (requires an FTS index on the table):
+
+```bash
+dclient rows dogs --search "retriever"
+```
+
+### Pagination
+
+By default only one page of results is returned. Use `--all` to auto-paginate through all rows, and `--limit` to cap the total:
+
+```bash
+dclient rows dogs --all
+dclient rows dogs --all --limit 500
+dclient rows dogs --size 50
+```
+
+### dclient rows --help
+<!-- [[[cog
+import cog
+from dclient import cli
+from click.testing import CliRunner
+runner = CliRunner()
+result = runner.invoke(cli.cli, ["rows", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient rows [OPTIONS] DB_OR_TABLE [TABLE]
+
+  Browse rows in a table with filtering and sorting
+
+  If only one positional argument is given, it is treated as the table name and
+  the default database is used. Pass two arguments for database and table.
+
+  Example usage:
+
+      dclient rows facet_cities
+      dclient rows fixtures facet_cities -i https://latest.datasette.io
+      dclient rows facet_cities -f id gte 3 --sort name -t
+
+Options:
+  -i, --instance TEXT   Datasette instance URL or alias
+  -d, --database TEXT   Database name
+  --token TEXT          API token
+  -f, --filter TEXT...  Filter: column operation value (e.g. -f age gte 3)
+  --search TEXT         Full-text search query
+  --sort TEXT           Sort by column (ascending)
+  --sort-desc TEXT      Sort by column (descending)
+  --col TEXT            Include only these columns
+  --nocol TEXT          Exclude these columns
+  --size INTEGER        Number of rows per page
+  --limit INTEGER       Maximum total rows to return
+  --all                 Fetch all pages
+  -v, --verbose         Verbose output: show HTTP request
+  --csv                 Output as CSV
+  --tsv                 Output as TSV
+  --nl                  Output as newline-delimited JSON
+  -t, --table           Output as ASCII table
+  --help                Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
 ## Output formats
 
 By default, results are returned as JSON. Use these flags to change the output format:
@@ -45,7 +160,7 @@ By default, results are returned as JSON. Use these flags to change the output f
 - `-t` / `--table` — ASCII table
 - `--nl` — newline-delimited JSON (one JSON object per line)
 
-These flags work with both `dclient query` and the bare SQL shortcut.
+These flags work with `dclient query`, `dclient rows`, and the bare SQL shortcut.
 
 CSV output:
 

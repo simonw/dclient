@@ -359,6 +359,191 @@ def tables(instance, database, views, views_only, hidden, _json, token):
             click.echo(item)
 
 
+# Convenience aliases for common filter operations.
+# Any operation not listed here is passed through directly to Datasette,
+# so plugins that add custom filter operations will work too.
+FILTER_ALIASES = {
+    "eq": "exact",
+}
+
+
+@cli.command()
+@click.argument("db_or_table")
+@click.argument("table", required=False, default=None)
+@click.option("-i", "--instance", default=None, help="Datasette instance URL or alias")
+@click.option("-d", "--database", default=None, help="Database name")
+@click.option("--token", help="API token")
+@click.option(
+    "-f",
+    "--filter",
+    "filters",
+    multiple=True,
+    nargs=3,
+    help="Filter: column operation value (e.g. -f age gte 3)",
+)
+@click.option("--search", default=None, help="Full-text search query")
+@click.option("--sort", default=None, help="Sort by column (ascending)")
+@click.option("--sort-desc", default=None, help="Sort by column (descending)")
+@click.option("--col", "columns", multiple=True, help="Include only these columns")
+@click.option("--nocol", "nocolumns", multiple=True, help="Exclude these columns")
+@click.option("--size", type=int, default=None, help="Number of rows per page")
+@click.option("--limit", type=int, default=None, help="Maximum total rows to return")
+@click.option("--all", "fetch_all", is_flag=True, help="Fetch all pages")
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output: show HTTP request")
+@output_format_options
+def rows(
+    db_or_table,
+    table,
+    instance,
+    database,
+    token,
+    filters,
+    search,
+    sort,
+    sort_desc,
+    columns,
+    nocolumns,
+    size,
+    limit,
+    fetch_all,
+    verbose,
+    fmt_csv,
+    fmt_tsv,
+    fmt_nl,
+    fmt_table,
+):
+    """
+    Browse rows in a table with filtering and sorting
+
+    If only one positional argument is given, it is treated as the table name
+    and the default database is used. Pass two arguments for database and table.
+
+    Example usage:
+
+    \b
+        dclient rows facet_cities
+        dclient rows fixtures facet_cities -i https://latest.datasette.io
+        dclient rows facet_cities -f id gte 3 --sort name -t
+    """
+    config_dir = get_config_dir()
+    url = _resolve_instance(instance, config_dir / "config.json")
+
+    # Figure out database and table from positional args
+    if table is not None:
+        db = db_or_table
+    else:
+        # Only one positional arg — it's the table, resolve database from defaults
+        table = db_or_table
+        instance_alias = (
+            _instance_alias_for_url(url, config_dir / "config.json")
+            if not (
+                instance
+                and (instance.startswith("http://") or instance.startswith("https://"))
+            )
+            else None
+        )
+        if instance and not (
+            instance.startswith("http://") or instance.startswith("https://")
+        ):
+            instance_alias = instance
+        db = _resolve_database(database, instance_alias, config_dir / "config.json")
+
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
+
+    # Build query params
+    params = {"_shape": "objects"}
+    for col, op, val in filters:
+        datasette_op = FILTER_ALIASES.get(op, op)
+        params[f"{col}__{datasette_op}"] = val
+    if search:
+        params["_search"] = search
+    if sort:
+        params["_sort"] = sort
+    if sort_desc:
+        params["_sort_desc"] = sort_desc
+    for col in columns:
+        # httpx handles repeated keys if we use a list of tuples
+        pass
+    for col in nocolumns:
+        pass
+    if size:
+        params["_size"] = str(size)
+
+    # Convert to list of tuples to support repeated keys (_col, _nocol)
+    param_items = list(params.items())
+    for col in columns:
+        param_items.append(("_col", col))
+    for col in nocolumns:
+        param_items.append(("_nocol", col))
+
+    # First request
+    table_url = url.rstrip("/") + "/" + db + "/" + table + ".json"
+    if verbose:
+        click.echo(table_url, err=True)
+
+    all_rows = []
+    col_names = None
+    total = 0
+    next_page_url = None
+    first = True
+
+    while True:
+        if first:
+            response = _make_request(
+                url, token, f"/{db}/{table}.json", params=param_items
+            )
+            first = False
+        else:
+            # Follow next_url directly
+            headers = {}
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            response = httpx.get(
+                next_page_url,
+                headers=headers,
+                follow_redirects=True,
+                timeout=30.0,
+            )
+
+        if response.status_code != 200:
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                raise click.ClickException(f"{response.status_code} status code")
+            bits = []
+            if data.get("title"):
+                bits.append(data["title"])
+            if data.get("error"):
+                bits.append(data["error"])
+            raise click.ClickException(
+                "{} status code. {}".format(response.status_code, ": ".join(bits))
+            )
+
+        data = response.json()
+        page_rows = data.get("rows", [])
+        if col_names is None:
+            col_names = data.get("columns")
+
+        if limit:
+            remaining = limit - total
+            page_rows = page_rows[:remaining]
+
+        all_rows.extend(page_rows)
+        total += len(page_rows)
+
+        if limit and total >= limit:
+            break
+
+        next_page_url = data.get("next_url")
+        if not fetch_all or not next_page_url:
+            break
+
+    fmt = _determine_output_format(fmt_csv, fmt_tsv, fmt_nl, fmt_table)
+    _output_rows(all_rows, fmt, col_names)
+
+
 @cli.command()
 @click.argument("database")
 @click.argument("sql")
@@ -1320,7 +1505,7 @@ def login(alias_or_url, scope):
     interval = device_data.get("interval", 5)
 
     # Step 2: Show instructions
-    click.echo(f"\nOpen this URL in your browser:\n")
+    click.echo("\nOpen this URL in your browser:\n")
     click.echo(f"    {verification_uri}\n")
     click.echo(f"Enter this code: {user_code}\n")
     click.echo("Waiting for authorization...", nl=False)

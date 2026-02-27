@@ -4,7 +4,6 @@ from click.testing import CliRunner
 from dclient.cli import cli
 import json
 import pathlib
-import pytest
 
 # -- databases command --
 

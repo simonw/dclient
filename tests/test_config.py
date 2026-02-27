@@ -6,7 +6,6 @@ from dclient.cli import (
     _resolve_instance,
     _resolve_database,
     _resolve_token,
-    get_config_dir,
 )
 import json
 import pathlib

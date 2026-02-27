@@ -11,6 +11,7 @@ Much of the functionality requires Datasette 1.0a2 or higher.
 
 ## Things you can do with dclient
 
+- Browse table data with filtering, sorting, and pagination — no SQL required
 - Run SQL queries against Datasette and return the results as JSON, CSV, TSV, or an ASCII table
 - Introspect databases, tables, plugins, and schema
 - Run queries against authenticated Datasette instances
@@ -46,6 +47,10 @@ dclient query fixtures "select * from facetable limit 1" -i latest
 Output as a table with `-t`, or use `--csv`, `--tsv`, `--nl`:
 ```bash
 dclient "select pk, state from facetable limit 3" -t
+```
+Browse table rows without SQL:
+```bash
+dclient rows facetable -f state eq CA --sort _city_id -t
 ```
 
 ## Introspection
