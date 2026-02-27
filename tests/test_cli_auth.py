@@ -290,6 +290,226 @@ def test_login_with_alias_sets_defaults(httpx_mock, mocker, tmpdir):
     assert config["instances"]["prod"]["default_database"] == "data"
 
 
+def test_login_read_all(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/", "--read-all"])
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance"],
+        ["view-table"],
+        ["view-database"],
+        ["view-query"],
+        ["execute-sql"],
+    ]
+
+
+def test_login_write_all(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/", "--write-all"])
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance"],
+        ["view-table"],
+        ["view-database"],
+        ["view-query"],
+        ["execute-sql"],
+        ["insert-row"],
+        ["delete-row"],
+        ["update-row"],
+        ["create-table"],
+        ["alter-table"],
+        ["drop-table"],
+    ]
+
+
+def test_login_read_database(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/", "--read", "db1"])
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance", "db1"],
+        ["view-table", "db1"],
+        ["view-database", "db1"],
+        ["view-query", "db1"],
+        ["execute-sql", "db1"],
+    ]
+
+
+def test_login_write_table(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["login", "https://example.com/", "--write", "db3/submissions"]
+    )
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance", "db3", "submissions"],
+        ["view-table", "db3", "submissions"],
+        ["view-database", "db3", "submissions"],
+        ["view-query", "db3", "submissions"],
+        ["execute-sql", "db3", "submissions"],
+        ["insert-row", "db3", "submissions"],
+        ["delete-row", "db3", "submissions"],
+        ["update-row", "db3", "submissions"],
+        ["create-table", "db3", "submissions"],
+        ["alter-table", "db3", "submissions"],
+        ["drop-table", "db3", "submissions"],
+    ]
+
+
+def test_login_mixed_read_write(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["login", "https://example.com/", "--read", "db1", "--write", "db3/dogs"],
+    )
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance", "db1"],
+        ["view-table", "db1"],
+        ["view-database", "db1"],
+        ["view-query", "db1"],
+        ["execute-sql", "db1"],
+        ["view-instance", "db3", "dogs"],
+        ["view-table", "db3", "dogs"],
+        ["view-database", "db3", "dogs"],
+        ["view-query", "db3", "dogs"],
+        ["execute-sql", "db3", "dogs"],
+        ["insert-row", "db3", "dogs"],
+        ["delete-row", "db3", "dogs"],
+        ["update-row", "db3", "dogs"],
+        ["create-table", "db3", "dogs"],
+        ["alter-table", "db3", "dogs"],
+        ["drop-table", "db3", "dogs"],
+    ]
+
+
+def test_login_scope_combined_with_shortcuts(httpx_mock, mocker, tmpdir):
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "login",
+            "https://example.com/",
+            "--scope",
+            '[["view-instance"]]',
+            "--write",
+            "db1/dogs",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    from urllib.parse import parse_qs
+
+    request = httpx_mock.get_requests()[0]
+    body = parse_qs(request.content.decode())
+    scope = json.loads(body["scope"][0])
+    assert scope == [
+        ["view-instance"],
+        ["view-instance", "db1", "dogs"],
+        ["view-table", "db1", "dogs"],
+        ["view-database", "db1", "dogs"],
+        ["view-query", "db1", "dogs"],
+        ["execute-sql", "db1", "dogs"],
+        ["insert-row", "db1", "dogs"],
+        ["delete-row", "db1", "dogs"],
+        ["update-row", "db1", "dogs"],
+        ["create-table", "db1", "dogs"],
+        ["alter-table", "db1", "dogs"],
+        ["drop-table", "db1", "dogs"],
+    ]
+
+
+def test_login_no_scope_sends_no_scope(httpx_mock, mocker, tmpdir):
+    """Without any scope options, no scope field should be sent."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    httpx_mock.add_response(json=[{"name": "data"}], status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["login", "https://example.com/"])
+    assert result.exit_code == 0, result.output
+    request = httpx_mock.get_requests()[0]
+    assert request.content == b""
+
+
+def test_login_token_only(httpx_mock, mocker, tmpdir):
+    """--token-only prints the token to stdout and does not save it."""
+    mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))
+    mocker.patch("dclient.cli.time.sleep")
+    httpx_mock.add_response(json=DEVICE_RESPONSE, status_code=200)
+    httpx_mock.add_response(json=TOKEN_SUCCESS, status_code=200)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["login", "https://example.com/", "--token-only", "--read", "foo/bar"]
+    )
+    assert result.exit_code == 0, result.output
+    # Last line of output should be the raw token
+    assert result.output.strip().endswith("dstok_abc123")
+    # Should NOT have "Login successful" message
+    assert "Login successful" not in result.output
+    # auth.json should not exist
+    auth_file = pathlib.Path(tmpdir) / "auth.json"
+    assert not auth_file.exists()
+    # config.json should not exist (no defaults set)
+    config_file = pathlib.Path(tmpdir) / "config.json"
+    assert not config_file.exists()
+
+
 def test_login_databases_error_still_succeeds(httpx_mock, mocker, tmpdir):
     """If the databases check fails, login should still succeed."""
     mocker.patch("dclient.cli.get_config_dir", return_value=pathlib.Path(tmpdir))

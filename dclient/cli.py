@@ -1450,10 +1450,72 @@ def auth_status(instance, token):
 # -- login command (OAuth device flow) --
 
 
+READ_SCOPES = [
+    "view-instance",
+    "view-table",
+    "view-database",
+    "view-query",
+    "execute-sql",
+]
+WRITE_SCOPES = [
+    "insert-row",
+    "delete-row",
+    "update-row",
+    "create-table",
+    "alter-table",
+    "drop-table",
+]
+
+
+def _merge_scopes(scope, read_all, write_all, read, write):
+    """Merge --scope JSON with --read-all/--write-all/--read/--write options."""
+    scopes = json.loads(scope) if scope else []
+    if read_all:
+        for action in READ_SCOPES:
+            scopes.append([action])
+    if write_all:
+        for action in READ_SCOPES + WRITE_SCOPES:
+            scopes.append([action])
+    for target in read or []:
+        parts = target.split("/", 1)
+        if len(parts) == 1:
+            for action in READ_SCOPES:
+                scopes.append([action, parts[0]])
+        else:
+            for action in READ_SCOPES:
+                scopes.append([action, parts[0], parts[1]])
+    for target in write or []:
+        parts = target.split("/", 1)
+        if len(parts) == 1:
+            for action in READ_SCOPES + WRITE_SCOPES:
+                scopes.append([action, parts[0]])
+        else:
+            for action in READ_SCOPES + WRITE_SCOPES:
+                scopes.append([action, parts[0], parts[1]])
+    if scopes:
+        return json.dumps(scopes)
+    return None
+
+
 @cli.command()
 @click.argument("alias_or_url", required=False, default=None)
 @click.option("--scope", default=None, help="JSON scope array")
-def login(alias_or_url, scope):
+@click.option("--read-all", is_flag=True, help="Request instance-wide read access")
+@click.option("--write-all", is_flag=True, help="Request instance-wide write access")
+@click.option(
+    "--read", multiple=True, help="Request read access for a database or database/table"
+)
+@click.option(
+    "--write",
+    multiple=True,
+    help="Request write access for a database or database/table",
+)
+@click.option(
+    "--token-only",
+    is_flag=True,
+    help="Output the token to stdout instead of saving it",
+)
+def login(alias_or_url, scope, read_all, write_all, read, write, token_only):
     """
     Authenticate with a Datasette instance using OAuth
 
@@ -1466,7 +1528,13 @@ def login(alias_or_url, scope):
         dclient login https://simon.datasette.cloud/
         dclient login myalias
         dclient login
+        dclient login --read-all
+        dclient login --write-all
+        dclient login --read db1
+        dclient login --write db3/submissions
+        dclient login --read db1 --write db3/dogs
     """
+    scope = _merge_scopes(scope, read_all, write_all, read, write)
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     config_file = config_dir / "config.json"
@@ -1539,9 +1607,12 @@ def login(alias_or_url, scope):
             click.echo()
             raise click.ClickException(f"Unexpected error: {error}")
 
-    # Step 4: Save token
+    # Step 4: Save token (or print it)
     click.echo()
     access_token = token_data["access_token"]
+    if token_only:
+        click.echo(access_token)
+        return
     auth_file = config_dir / "auth.json"
     auths = _load_auths(auth_file)
     auths[auth_key] = access_token

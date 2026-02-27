@@ -26,10 +26,48 @@ dclient login
 
 This will display a URL and a code. Open the URL in your browser, enter the code to approve access, and the resulting API token will be saved automatically. If you run `dclient login` without an argument, you will be prompted for the instance URL or alias.
 
-You can also pass a `--scope` option to request specific permissions:
+### Requesting scoped tokens
+
+By default, `dclient login` requests an unrestricted token. You can request a token with limited permissions using the shorthand options:
+
+```bash
+# Instance-wide read or write access
+dclient login --read-all
+dclient login --write-all
+
+# Database-level access
+dclient login --read db1
+dclient login --write db3
+
+# Table-level access
+dclient login --read db1/dogs
+dclient login --write db3/submissions
+
+# Mixed
+dclient login --read db1 --write db3/dogs
+```
+
+`--read-all` grants: `view-instance`, `view-table`, `view-database`, `view-query`, `execute-sql`.
+
+`--write-all` grants all read scopes plus: `insert-row`, `delete-row`, `update-row`, `create-table`, `alter-table`, `drop-table`.
+
+`--read` and `--write` accept a database name or `database/table` and can be specified multiple times. `--write` implies read access for the same target.
+
+For advanced use, you can also pass raw scope JSON with `--scope`:
 
 ```bash
 dclient login myalias --scope '[["view-instance"]]'
+```
+
+All scope options can be combined — the shorthand options append to whatever `--scope` provides.
+
+### Outputting the token directly
+
+Use `--token-only` to print the token to stdout instead of saving it. This is useful for creating debug tokens or piping them into other tools:
+
+```bash
+dclient login --token-only --read mydb
+dclient login --token-only --write-all
 ```
 
 ## dclient login --help
@@ -58,9 +96,19 @@ Usage: dclient login [OPTIONS] [ALIAS_OR_URL]
       dclient login https://simon.datasette.cloud/
       dclient login myalias
       dclient login
+      dclient login --read-all
+      dclient login --write-all
+      dclient login --read db1
+      dclient login --write db3/submissions
+      dclient login --read db1 --write db3/dogs
 
 Options:
   --scope TEXT  JSON scope array
+  --read-all    Request instance-wide read access
+  --write-all   Request instance-wide write access
+  --read TEXT   Request read access for a database or database/table
+  --write TEXT  Request write access for a database or database/table
+  --token-only  Output the token to stdout instead of saving it
   --help        Show this message and exit.
 
 ```
