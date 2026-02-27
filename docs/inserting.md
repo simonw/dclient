@@ -1,5 +1,43 @@
 # Inserting data
 
+## Creating tables
+
+The `dclient create-table` command creates a new empty table with an explicit schema. Define columns with `--column name type` and optionally set primary keys with `--pk`:
+
+```bash
+dclient create-table mydb dogs \
+  --column id integer \
+  --column name text \
+  --column age integer \
+  --pk id \
+  -i myapp
+```
+
+This hits the Datasette [create API](https://docs.datasette.io/en/latest/json_api.html#the-json-write-api) with a `columns` array. The response includes the generated schema:
+
+```json
+{
+  "ok": true,
+  "database": "mydb",
+  "table": "dogs",
+  "schema": "CREATE TABLE [dogs] (\n   [id] INTEGER PRIMARY KEY,\n   [name] TEXT,\n   [age] INTEGER\n)"
+}
+```
+
+Compound primary keys are supported by passing `--pk` multiple times:
+
+```bash
+dclient create-table mydb events \
+  --column user_id integer \
+  --column event_id integer \
+  --column data text \
+  --pk user_id --pk event_id
+```
+
+If you want to create a table and populate it with data in one step, use `dclient insert --create` instead.
+
+## Inserting rows
+
 The `dclient insert` command can be used to insert data from a local file directly into a Datasette instance, via the [Write API](https://docs.datasette.io/en/latest/json_api.html#the-json-write-api) introduced in the Datasette 1.0 alphas.
 
 First you'll need to {ref}`authenticate <authentication>` with the instance.
@@ -178,6 +216,37 @@ Options:
   --silent              Don't output progress
   -v, --verbose         Verbose output: show HTTP request and response
   --help                Show this message and exit.
+
+```
+<!-- [[[end]]] -->
+
+## dclient create-table --help
+<!-- [[[cog
+import cog
+result = runner.invoke(cli.cli, ["create-table", "--help"])
+help = result.output.replace("Usage: cli", "Usage: dclient")
+cog.out(
+    "```\n{}\n```".format(help)
+)
+]]] -->
+```
+Usage: dclient create-table [OPTIONS] DATABASE TABLE_NAME
+
+  Create a new empty table with an explicit schema
+
+  Example usage:
+
+      dclient create-table mydb dogs \
+        --column id integer --column name text --pk id
+
+Options:
+  --column TEXT...     Column definition: name type (e.g. --column id integer
+                       --column name text)
+  --pk TEXT            Column(s) to use as primary key
+  -i, --instance TEXT  Datasette instance URL or alias
+  --token TEXT         API token
+  -v, --verbose        Verbose output: show HTTP request and response
+  --help               Show this message and exit.
 
 ```
 <!-- [[[end]]] -->

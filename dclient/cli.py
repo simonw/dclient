@@ -719,6 +719,82 @@ def upsert(
     )
 
 
+@cli.command(name="create-table")
+@click.argument("database")
+@click.argument("table_name")
+@click.option(
+    "--column",
+    "-c",
+    "column_defs",
+    multiple=True,
+    nargs=2,
+    help="Column definition: name type (e.g. --column id integer --column name text)",
+)
+@click.option(
+    "pks",
+    "--pk",
+    multiple=True,
+    help="Column(s) to use as primary key",
+)
+@click.option("-i", "--instance", default=None, help="Datasette instance URL or alias")
+@click.option("--token", help="API token")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Verbose output: show HTTP request and response",
+)
+def create_table(database, table_name, column_defs, pks, instance, token, verbose):
+    """
+    Create a new empty table with an explicit schema
+
+    Example usage:
+
+    \b
+        dclient create-table mydb dogs \\
+          --column id integer --column name text --pk id
+    """
+    config_dir = get_config_dir()
+    url = _resolve_instance(instance, config_dir / "config.json")
+    token = _resolve_token(
+        token, url, config_dir / "auth.json", config_dir / "config.json"
+    )
+
+    if not column_defs:
+        raise click.ClickException("Provide at least one --column definition")
+
+    columns = [{"name": name, "type": typ} for name, typ in column_defs]
+    data = {"table": table_name, "columns": columns}
+    if pks:
+        if len(pks) == 1:
+            data["pk"] = pks[0]
+        else:
+            data["pks"] = list(pks)
+
+    api_url = url.rstrip("/") + "/" + database + "/-/create"
+    if verbose:
+        click.echo("POST {}".format(api_url), err=True)
+        click.echo(textwrap.indent(json.dumps(data, indent=2), "  "), err=True)
+    response = httpx.post(
+        api_url,
+        headers={
+            "Authorization": "Bearer {}".format(token),
+            "Content-Type": "application/json",
+        },
+        json=data,
+        timeout=30.0,
+    )
+    if verbose:
+        click.echo(str(response), err=True)
+    if str(response.status_code)[0] != "2":
+        if "/json" in response.headers.get("content-type", ""):
+            resp_data = response.json()
+            if "errors" in resp_data:
+                raise click.ClickException("\n".join(resp_data["errors"]))
+        response.raise_for_status()
+    click.echo(json.dumps(response.json(), indent=2))
+
+
 @cli.command()
 @click.argument("table_name", required=False, default=None)
 @click.option("-i", "--instance", default=None, help="Datasette instance URL or alias")
