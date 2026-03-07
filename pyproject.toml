@@ -1,6 +1,6 @@
 [project]
 name = "dclient"
-version = "0.5a2"
+version = "0.5a3"
 description = "A client CLI utility for Datasette instances"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 dependencies = [
     "click",
     "click-default-group",
-    "httpx",
+    "httpx<1.0",
     "sqlite-utils",
 ]
 
