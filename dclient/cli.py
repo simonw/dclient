@@ -23,7 +23,12 @@ def get_config_dir():
 
 def _load_config(config_file):
     if config_file.exists():
-        return json.loads(config_file.read_text())
+        try:
+            return json.loads(config_file.read_text())
+        except json.JSONDecodeError as ex:
+            raise click.ClickException(
+                "Invalid JSON in {}: {}".format(config_file, ex.msg)
+            ) from ex
     return {"default_instance": None, "instances": {}}
 
 
